@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="trustDAO">
+
+    <resultMap id="trustMap" type="hashmap"/>
+
+
+    <insert id="intApplyTrust" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO">
+      INSERT INTO TB_40171031
+      (
+          TRUST_REQ_CODE,
+          TRUST_STATUS,
+          USER_EMAIL,
+          CN_KND_CD,
+          REQ_AMT,
+          MNTH,
+          RATE,
+          EXP_IZA,
+          REQ_DT,
+          EXPIRE_DT,
+          REG_EMAIL,
+          REG_DT,
+          REG_IP,
+          TRUST_EXPIRE_YN
+      )
+      VALUES
+      (
+        FN_GEN_KEY('TB_40171031','TRUST_REQ_CODE',''),
+        #{trustStatus},
+        #{userEmail},
+        #{cnKndCd},
+        #{reqAmt},
+        #{month},
+        #{rate},
+        #{expInterest},
+        #{reqDt },
+        #{expireDt },
+        #{userEmail},
+        SYSDATE,
+        #{regIp},
+        'N'
+      )
+    </insert>
+
+
+    <select id="getTrustList" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO" resultType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        SELECT TT.*
+        FROM (SELECT ROWNUM AS NO,T.* FROM(
+        SELECT
+        TRUST_REQ_CODE  TRUSTREQCODE,
+        REQ_DT REQDT,
+        EXPIRE_DT EXPIREDT,
+        (SELECT CMM_NM FROM TB_30171021 WHERE CMM_CD = CN_KND_CD) CMMNM,
+        REQ_AMT REQAMT,
+        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE RATE END RATE,
+        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE EXP_IZA END AS EXPINTEREST,
+        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE REQ_AMT + EXP_IZA END AS TOTALAMT,
+        CANCEL_DT CANCELDT,
+        TRUST_STATUS TRUSTSTATUS
+        FROM
+        TB_40171031
+        WHERE
+        USER_EMAIL = #{userEmail}
+        ORDER BY TRUST_REQ_CODE DESC , REG_DT DESC) T ) TT
+            <if test="clientCd == 'CMMC00000000223'">
+                WHERE NO BETWEEN #{firstIndex} + 1  AND #{firstIndex} + #{recordCountPerPage}
+            </if>
+            <if test="clientCd == null">
+                WHERE NO  <![CDATA[<=]]> #{listSize}
+            </if>
+
+    </select>
+
+    <select id="getTrustListCnt" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO" resultType="int">
+        SELECT COUNT(*)
+        FROM(
+            SELECT ROWNUM AS NO, T.*
+            FROM (
+                SELECT
+                        TRUST_REQ_CODE  TRUSTREQCODE,
+                        REQ_DT REQDT,
+                        EXPIRE_DT EXPIREDT,
+                        (SELECT CMM_NM FROM TB_30171021 WHERE CMM_CD = CN_KND_CD) CMMNM,
+                        REQ_AMT REQAMT,
+                        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE RATE END RATE,
+                        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE EXP_IZA END AS EXPINTEREST,
+                        CASE WHEN(TRUST_STATUS = 'CMMC00000001347') THEN NULL ELSE REQ_AMT + EXP_IZA END AS TOTALAMT,
+                        CANCEL_DT CANCELDT,
+                        TRUST_STATUS TRUSTSTATUS
+                FROM
+                        TB_40171031
+                WHERE
+                        USER_EMAIL = #{userEmail}
+                ORDER BY REG_DT DESC , TRUST_REQ_CODE DESC) T ) A
+    </select>
+
+    <update id="uptTrustInfo" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        UPDATE TB_40171031
+            SET
+              CANCEL_DT = #{cancelDt},
+              TRUST_STATUS = #{trustStatus},
+              UPT_EMAIL = #{userEmail},
+              UPT_DT = SYSDATE,
+              UPT_IP = #{regIp}
+              <if test='cnKndCd == "CMMC00000001650" and minusAsset == "Y"'>
+              , RF_AMT = (SELECT EXP_IZA * 1.5 FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+              </if>
+              <if test='cnKndCd == "CMMC00000001467" and minusAsset == "Y"'>
+              , RF_AMT = (SELECT EXP_IZA * 1.5 FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+              </if>
+              <if test='cnKndCd == "CMMC10000000001" and minusAsset == "Y"'>
+              , RF_AMT = (SELECT EXP_IZA * 1.5 FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+              </if>
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            TRUST_REQ_CODE = #{trustReqCode}
+        AND
+            TRUST_STATUS = 'CMMC00000001346'
+    </update>
+
+    <update id="plusTrustCoin" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        UPDATE TB_10171028
+            SET
+                TOT_AMT = TOT_AMT - #{posAmt},
+                TRUST_AMT = TRUST_AMT + #{posAmt}
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            CN_KND_CD = #{cnKndCd}
+    </update>
+
+    <update id="minusTrustCoin" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        UPDATE TB_10171028
+            SET
+            <choose>
+                <when test='cnKndCd == "CMMC00000001650" and minusAsset == "Y"'>
+                    TRUST_AMT = TRUST_AMT - (SELECT REQ_AMT FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode}) ,
+                    TOT_AMT = TOT_AMT + (SELECT REQ_AMT - (EXP_IZA * 1.5) FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+                </when>
+                <when test='cnKndCd == "CMMC10000000001" and minusAsset == "Y"'>
+                    TRUST_AMT = TRUST_AMT - (SELECT REQ_AMT FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode}) ,
+                    TOT_AMT = TOT_AMT + (SELECT REQ_AMT - (EXP_IZA * 1.5) FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+                </when>
+                <when test='cnKndCd == "CMMC00000001467" and minusAsset == "Y"'>
+                    TRUST_AMT = TRUST_AMT - (SELECT REQ_AMT FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode}) ,
+                    TOT_AMT = TOT_AMT + (SELECT REQ_AMT - (EXP_IZA * 1.5) FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+                </when>
+                <otherwise>
+                    TRUST_AMT = TRUST_AMT - (SELECT REQ_AMT FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode}) ,
+                    TOT_AMT = TOT_AMT + (SELECT REQ_AMT FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+                </otherwise>
+            </choose>
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            CN_KND_CD = (SELECT CN_KND_CD FROM TB_40171031 WHERE TRUST_REQ_CODE = #{trustReqCode})
+    </update>
+
+    <select id="getMonthRateList" parameterType="String" resultType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        SELECT
+              CN_KND_CD CNKNDCD,
+              MNTH MONTH,
+              RATE RATE
+        FROM
+              TB_40171030
+        WHERE
+              CN_KND_CD = #{value}
+        ORDER BY MONTH ASC
+    </select>
+
+    <select id="getCoinMinAmt" parameterType="String" resultType="String">
+        SELECT
+            TRUST_MIN_AMT
+        FROM
+            TB_10171077
+        WHERE
+            CN_KND_CD = #{value}
+    </select>
+
+    <select id="getUserCoinPrc" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO" resultType="String">
+         WITH COIN_LST AS  /*  2018-06-11 ONE QUERY 로 수정  */
+       (
+               SELECT T1.CMM_CD CN_KND_CD1, FN_CUR_PRICE('', T1.CMM_CD) CN_PRC
+               FROM TB_30171021 T1
+               WHERE     T1.CMM_CD = #{cnKndCd}
+       )
+       SELECT
+           TO_CHAR (NVL (KWDPRC, '0'), 'FM999999999999990') KWDPRC
+       FROM (SELECT CMM_CD CURCYCD,
+                    CMM_SN
+             FROM TB_30171021
+             WHERE     CMM_CD = #{cnKndCd}) T1,
+           (SELECT CN_KND_CD CURCYCD,
+                   CNPRC * (POS_AMT + USE_AMT) KWDPRC
+            FROM (SELECT (SELECT CN_PRC
+                          FROM COIN_LST aa
+                          WHERE aa.CN_KND_CD1 = CN_KND_CD)
+                                                             CNPRC,
+                         (TOT_AMT + EX_IN_AMT)
+                         - TOT_SEL_AMT
+                         + CNCL_AMT
+                         - BUY_FEE_AMT
+                                                             POS_AMT,
+                         TOT_SEL_AMT - EX_OUT_AMT - CNCL_AMT USE_AMT,
+                      CN_KND_CD
+                  FROM TB_10171028
+                  WHERE USER_EMAIL = #{userEmail})
+           ) T2
+       WHERE T1.CURCYCD = T2.CURCYCD(+)
+    </select>
+
+    <select id="getTrustInfo" parameterType="String" resultType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        SELECT
+            USER_EMAIL USEREMAIL,
+            REQ_AMT REQAMT,
+            REQ_DT REQDT,
+            CANCEL_DT CANCELDT,
+            CN_KND_CD CNKNDCD,
+            MNTH MONTH
+        FROM
+          TB_40171031
+        WHERE
+          TRUST_REQ_CODE = #{value}
+    </select>
+
+
+    <select id="getInterest" parameterType="String" resultType="com.bitkrx.api.trust.vo.LendingVO">
+      SELECT
+        DFT_RATE DFTRATE,
+        DFT_OVER_RATE DFTOVERRATE,
+        EXTENSION_RATE EXTENSIONRATE,
+        EXTENSION_OVER_RATE EXTENSIONOVERRATE
+      FROM
+        TB_60180003
+      WHERE
+        CN_KND_CD = #{value}
+    </select>
+
+    <select id="getLendingAmt" parameterType="String" resultType="com.bitkrx.api.trust.vo.LendingVO">
+      SELECT
+        REN_MIN_AMT MINAMT,
+        REN_MAX_AMT MAXAMT
+      FROM
+        TB_60180004
+      WHERE
+        CN_KND_CD = #{value}
+    </select>
+
+    <select id="getApplyChk" parameterType="String" resultType="String">
+        SELECT FN_RENDING_YN(#{value}) FROM DUAL
+    </select>
+
+    <select id="getLendingList" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="com.bitkrx.api.trust.vo.LendingVO">
+        SELECT TT.*
+        FROM(SELECT ROWNUM AS NO,T.* FROM(
+        SELECT
+        T1.REN_DFT_CODE RENDFTCODE,
+        T1.USER_EMAIL USEREMAIL,
+        FN_CMM_CD(T1.CN_KND_CD , '') CNKNDNM,
+        SUBSTR(T1.APPLY_DT , 1,4) || '/' || SUBSTR(T1.APPLY_DT , 5,2) || '/' || SUBSTR(T1.APPLY_DT , 7,2) APPLYDT,
+        SUBSTR(T1.EXPIRE_DT , 1,4) || '/' || SUBSTR(T1.EXPIRE_DT , 5,2) || '/' || SUBSTR(T1.EXPIRE_DT , 7,2) EXPIREDT,
+        CASE WHEN(T1.REN_DIV = '1') THEN SUBSTR(T1.OVER_DIV_DT , 1,4) || '/' || SUBSTR(T1.OVER_DIV_DT , 5,2) || '/' || SUBSTR(T1.OVER_DIV_DT , 7,2)
+        ELSE NULL END OVERDIVDT,
+        T1.REN_DIV RENDIV,
+        T1.APPLY_AMT APPLYAMT,
+        CASE WHEN(T1.REN_DIV = '0') THEN T2.DFT_RATE
+        ELSE T2.EXTENSION_RATE END INTERESTRATE,
+        T1.APPLY_STATUS APPLYSTATUS,
+        CASE
+        WHEN(T1.REPAY_DT IS NULL) THEN ''
+        ELSE
+        SUBSTR(T1.REPAY_DT , 1,4) || '/' || SUBSTR(T1.REPAY_DT , 5,2) || '/' || SUBSTR(T1.REPAY_DT , 7,2)
+        END REPAYDT,
+        T1.TOT_REPAY_AMT TOTREPAYAMT,
+        T1.EXTENSION_YN EXTENSIONYN,
+        CASE
+        WHEN(T1.APPLY_STATUS = 'CMMC00000001411' AND TO_DATE(T1.EXPIRE_DT , 'YYYY-MM-DD') - TO_DATE(TO_CHAR(SYSDATE , 'YYYY-MM-DD') , 'YYYY-MM-DD') + 1 <![CDATA[<]]> 31) THEN '2'
+        WHEN(T1.APPLY_STATUS = 'CMMC00000001412' OR T1.APPLY_STATUS = 'CMMC00000001412') THEN '0'
+        ELSE '1' END BTNVIEW,
+        T1.EXP_INTEREST EXPINTEREST
+        FROM
+        TB_60180001 T1 , TB_60180003 T2
+        WHERE
+        T1.CN_KND_CD = T2.CN_KND_CD
+        AND
+        T1.USER_EMAIL = #{userEmail}
+        ORDER BY T1.REG_DT DESC , T1.REN_DFT_CODE DESC) T ) TT
+        <if test="clientCd == 'CMMC00000000223'">
+            WHERE NO BETWEEN #{firstIndex} + 1  AND #{firstIndex} + #{recordCountPerPage}
+        </if>
+        <if test="clientCd == null">
+            WHERE NO  <![CDATA[<=]]> #{listSize}
+        </if>
+    </select>
+
+    <select id="getLendingListCnt" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="int">
+        SELECT COUNT(*)
+        FROM(
+            SELECT ROWNUM AS NO,T.*
+            FROM(
+                SELECT
+                        T1.REN_DFT_CODE RENDFTCODE,
+                        T1.USER_EMAIL USEREMAIL,
+                        FN_CMM_CD(T1.CN_KND_CD , '') CNKNDNM,
+                        SUBSTR(T1.APPLY_DT , 1,4) || '/' || SUBSTR(T1.APPLY_DT , 5,2) || '/' || SUBSTR(T1.APPLY_DT , 7,2) APPLYDT,
+                        SUBSTR(T1.EXPIRE_DT , 1,4) || '/' || SUBSTR(T1.EXPIRE_DT , 5,2) || '/' || SUBSTR(T1.EXPIRE_DT , 7,2) EXPIREDT,
+                        CASE WHEN(T1.REN_DIV = '1') THEN SUBSTR(T1.OVER_DIV_DT , 1,4) || '/' || SUBSTR(T1.OVER_DIV_DT , 5,2) || '/' || SUBSTR(T1.OVER_DIV_DT , 7,2)
+                        ELSE NULL END OVERDIVDT,
+                        T1.REN_DIV RENDIV,
+                        T1.APPLY_AMT APPLYAMT,
+                        CASE WHEN(T1.REN_DIV = '0') THEN T2.DFT_RATE
+                        ELSE T2.EXTENSION_RATE END INTERESTRATE,
+                        T1.APPLY_STATUS APPLYSTATUS,
+                        CASE
+                        WHEN(T1.REPAY_DT IS NULL) THEN ''
+                        ELSE
+                        SUBSTR(T1.REPAY_DT , 1,4) || '/' || SUBSTR(T1.REPAY_DT , 5,2) || '/' || SUBSTR(T1.REPAY_DT , 7,2)
+                        END REPAYDT,
+                        T1.TOT_REPAY_AMT TOTREPAYAMT,
+                        T1.EXTENSION_YN EXTENSIONYN,
+                        CASE
+                        WHEN(T1.APPLY_STATUS = 'CMMC00000001411' AND TO_DATE(T1.EXPIRE_DT , 'YYYY-MM-DD') - TO_DATE(TO_CHAR(SYSDATE , 'YYYY-MM-DD') , 'YYYY-MM-DD') + 1 <![CDATA[<]]> 31) THEN '2'
+                        WHEN(T1.APPLY_STATUS = 'CMMC00000001412' OR T1.APPLY_STATUS = 'CMMC00000001412') THEN '0'
+                        ELSE '1' END BTNVIEW,
+                        T1.EXP_INTEREST EXPINTEREST
+                FROM
+                        TB_60180001 T1 , TB_60180003 T2
+                WHERE
+                        T1.CN_KND_CD = T2.CN_KND_CD
+                AND
+                        T1.USER_EMAIL = #{userEmail}
+                ORDER BY REN_DFT_CODE DESC ) T ) A
+    </select>
+
+    <update id="PR_INS60180001" parameterType="hashmap" statementType="CALLABLE">
+        { call PR_INS60180001(
+			#{userEmail   , mode=IN,jdbcType=VARCHAR},
+			#{cnKndCd     , mode=IN,jdbcType=VARCHAR},
+			#{mthCmt      , mode=IN,jdbcType=INTEGER},
+			#{applyAmt    , mode=IN,jdbcType=INTEGER},
+			#{applyDt     , mode=IN,jdbcType=VARCHAR},
+			#{regEmail    , mode=IN,jdbcType=VARCHAR},
+			#{regIp       , mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=trustMap} )
+		}
+    </update>
+
+    <update id="PR_INS60180001_REPAY" parameterType="hashmap" statementType="CALLABLE">
+        { call PR_INS60180001_REPAY(
+            #{renDftCode     , mode=IN,jdbcType=VARCHAR},
+            #{userEmail      , mode=IN,jdbcType=VARCHAR},
+            #{cnKndCd        , mode=IN,jdbcType=VARCHAR},
+            #{regIp          , mode=IN,jdbcType=VARCHAR},
+            #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=trustMap} )
+        }
+    </update>
+
+    <update id="PR_INS60180001_EXTEND" parameterType="hashmap" statementType="CALLABLE">
+        { call PR_INS60180001_EXTEND(
+          #{renDftCode    , mode=IN,jdbcType=VARCHAR},
+          #{mthCmt        , mode=IN,jdbcType=VARCHAR},
+          #{userEmail     , mode=IN,jdbcType=VARCHAR},
+          #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=trustMap} )
+        }
+    </update>
+
+    <update id="PR_INS60180001_1_REPAY" parameterType="hashmap" statementType="CALLABLE">
+        { call PR_INS60180001_1_REPAY(
+           #{renDftCode   , mode=IN,jdbcType=VARCHAR},
+           #{userEmail    , mode=IN,jdbcType=VARCHAR},
+           #{cnKndCd      , mode=IN,jdbcType=VARCHAR},
+           #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=trustMap} )
+        }
+    </update>
+
+    <select id="getLendingDate" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="String">
+        SELECT
+            TO_CHAR(TO_DATE(TO_CHAR(SYSDATE , 'YYYY-MM-DD') , 'YYYY-MM-DD')
+            <if test="expireDt != '' and expireDt != null ">
+                + 359
+            </if>
+            , 'YYYY-MM-DD')
+
+        FROM DUAL
+    </select>
+
+    <select id="getExtensionDate" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="String">
+        SELECT
+            TO_CHAR(TO_DATE(#{extenSionDt} , 'YYYY-MM-DD') + 359 , 'YYYY-MM-DD' )
+        FROM DUAL
+    </select>
+
+    <select id="getLendingInfo" parameterType="String" resultType="com.bitkrx.api.trust.vo.LendingVO">
+         SELECT
+            REN_DFT_CODE RENDFTCODE,
+            USER_EMAIL USEREMAIL,
+            EXPIRE_DT EXPIREDT,
+            CN_KND_CD CNKNDCD,
+            EXTENSION_YN EXTENSIONYN,
+            REN_DIV RENDIV,
+            INTEREST_RATE INTERESTRATE,
+            EXP_INTEREST EXPINTEREST,
+            TOT_REPAY_AMT TOTREPAYAMT,
+            APPLY_AMT APPLYAMT,
+            APPLY_DT APPLYDT,
+            MTH_CMT MTHCMT
+        FROM
+            TB_60180001
+        WHERE
+            REN_DFT_CODE = #{value}
+    </select>
+
+    <select id="getExpireDt" parameterType="String" resultType="com.bitkrx.api.trust.vo.LendingVO">
+        SELECT
+            EXPIRE_DT EXPIREDT,
+            CN_KND_CD CNKNDCD,
+            EXTENSION_YN EXTENSIONYN,
+            REN_DIV RENDIV
+        FROM
+            TB_60180001
+        WHERE
+            REN_DFT_CODE = #{value}
+    </select>
+
+    <select id="getDifDate" parameterType="String" resultType="String">
+        SELECT
+            TO_DATE(TO_CHAR(SYSDATE , 'YYYY-MM-DD') , 'YYYY-MM-DD') - TO_DATE(#{value} , 'YYYY-MM-DD')
+        FROM DUAL
+    </select>
+
+    <select id="getRepaymentList" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="com.bitkrx.api.trust.vo.LendingVO">
+      SELECT TT.*
+      FROM(SELECT ROWNUM AS NO,T.* FROM(
+         SELECT
+             T1.REN_DIV RENDIV,
+             SUBSTR(T1.REPAY_DT , 1,4) || '/' || SUBSTR(T1.REPAY_DT , 5,2) || '/' || SUBSTR(T1.REPAY_DT , 7,2) REPAYDT,
+             T1.INTEREST_DIV INTERESTDIV,
+             T1.INTEREST_CNT INTERESTCNT,
+             T1.REPAY_AMT REPAYAMT,
+             T1.OVER_INTEREST OVERINTEREST,
+             T1.TOT_REPAY_AMT TOTREPAYAMT,
+             T1.REPAY_YN REPAYYN,
+             T1.MEMO MEMO,
+             FN_CMM_CD(T1.CN_KND_CD , '') CNKNDNM
+        FROM
+             TB_60180002 T1
+        WHERE
+            REN_DFT_CODE = #{renDftCode}
+        ORDER BY T1.INTEREST_CNT ) T ) TT
+    </select>
+
+    <select id="getRepaymentListCnt" parameterType="com.bitkrx.api.trust.vo.LendingVO" resultType="int">
+      SELECT COUNT(*)
+      FROM(SELECT ROWNUM AS NO,T.* FROM(
+         SELECT
+             T1.REN_DIV RENDIV,
+             SUBSTR(T1.REPAY_DT , 1,4) || '/' || SUBSTR(T1.REPAY_DT , 5,2) || '/' || SUBSTR(T1.REPAY_DT , 7,2) REPAYDT,
+             T1.INTEREST_DIV INTERESTDIV,
+             T1.INTEREST_CNT INTERESTCNT,
+             T1.REPAY_AMT REPAYAMT,
+             T1.OVER_INTEREST OVERINTEREST,
+             T1.TOT_REPAY_AMT TOTREPAYAMT,
+             T1.REPAY_YN REPAYYN,
+             T1.MEMO MEMO
+        FROM
+             TB_60180002 T1
+        WHERE
+            REN_DFT_CODE = #{renDftCode}
+        ORDER BY T1.INTEREST_CNT ) T ) TT
+    </select>
+
+
+    <select id="getTrustInterestList" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO" resultType="com.bitkrx.api.trust.vo.TrustCoinVO">
+        SELECT TT.*
+        FROM (SELECT ROWNUM AS NO,T.* FROM(
+        SELECT
+          T1.CN_DPT_CODE CNDPTCODE,
+          T1.CN_KND_CD CURCYCD,
+          FN_CMM_CD(T1.CN_KND_CD,'1') CMMNM,
+          TO_CHAR(T1.REG_DT,'YYYY/MM/DD HH24:MI:SS') REQDT ,
+          RTRIM(TO_CHAR(T1.CN_AMT,'FM99999999990.99999999'),'.') CNAMT,
+          T1.USER_EMAIL USEREMAIL
+        FROM
+          TB_30171030 T1
+        WHERE
+          1=1
+        AND
+          T1.USER_EMAIL = #{userEmail}
+        AND
+          T1.IN_GUBUN = 'I'
+        ORDER BY T1.CN_DPT_CODE DESC , T1.REG_DT DESC) T ) TT
+        <if test="clientCd == 'CMMC00000000223'">
+            WHERE NO BETWEEN #{firstIndex} + 1  AND #{firstIndex} + #{recordCountPerPage}
+        </if>
+        <if test="clientCd == null">
+            WHERE NO  <![CDATA[<=]]> #{listSize}
+        </if>
+
+    </select>
+
+    <select id="getTrustInterestCnt" parameterType="com.bitkrx.api.trust.vo.TrustCoinVO" resultType="int">
+        SELECT COUNT(*)
+        FROM( SELECT ROWNUM AS NO,T.* FROM(
+        SELECT
+          T1.CN_DPT_CODE CNDPTCODE,
+          T1.CN_KND_CD CURCYCD,
+          FN_CMM_CD(T1.CN_KND_CD,'1') CMMNM,
+          TO_CHAR(T1.REG_DT,'YYYY/MM/DD HH24:MI:SS') REQDT ,
+          RTRIM(TO_CHAR(T1.CN_AMT,'FM99999999990.99999999'),'.') CNAMT,
+          T1.USER_EMAIL USEREMAIL
+        FROM
+          TB_30171030 T1
+        WHERE
+          1=1
+        AND
+          T1.USER_EMAIL = #{userEmail}
+        AND
+          T1.IN_GUBUN = 'I'
+        ORDER BY T1.CN_DPT_CODE DESC , T1.REG_DT DESC) T ) A
+    </select>
+</mapper>
+
+
+
+
+

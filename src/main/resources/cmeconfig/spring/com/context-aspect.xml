@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+    http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd">
+    
+	<aop:aspectj-autoproxy proxy-target-class="true" />
+    <!-- 내부업무의 기능 작동과정에서 Exception 발생시 후처리를 위한 AOP설정  -->
+    <aop:config>
+        <aop:pointcut id="DataSourceBindMethod"
+            expression="execution(* com.bitkrx..impl.*Impl.*(..))" />		
+        
+        <aop:aspect ref="DataSourceBind">
+        	<aop:around method="doServiceProfiling" pointcut-ref="DataSourceBindMethod"/>
+        </aop:aspect>
+        
+    </aop:config>
+
+	<bean id="DataSourceBind" class="com.bitkrx.config.dbinfo.CmeDbExcutionLoggingAspect"/>
+<!-- 	<tx:annotation-driven proxy-target-class="true" order="2"/> -->
+    
+        
+</beans>

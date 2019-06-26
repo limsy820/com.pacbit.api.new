@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="logDAO">
+
+    <insert id="insParamLog" parameterType="com.bitkrx.api.log.vo.ParamLogVO">
+
+        INSERT INTO TB_50171036
+          (OUT_TR_CODE, REQ_URL, REG_EMAIL, REG_DT, REG_IP, PARAM)
+        VALUES
+            (FN_GEN_KEY('TB_50171036','OUT_TR_CODE',''),
+             #{reqUrl},
+             #{userEmail},
+             SYSDATE,
+             #{regIp},
+             #{param})
+    </insert>
+
+    <insert id="insSendParamLog" parameterType="com.bitkrx.api.log.vo.ParamLogVO">
+
+        INSERT INTO TB_501710361
+        (OUT_TR_CODE, REQ_URL, REG_EMAIL, REG_DT, REG_IP, PARAM)
+        VALUES
+            (FN_GEN_KEY('TB_50171036','OUT_TR_CODE',''),
+             #{reqUrl},
+             #{userEmail},
+             SYSDATE,
+             #{regIp},
+             #{param})
+    </insert>
+</mapper>

@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="BoardDAO">
+    <resultMap type="BoardVO" id="boardMAP">
+        <result property="boardId" column="BOARD_ID"/>
+        <result property="contentId" column="CONTENT_ID"/>
+        <result property="boardTitle" column="BOARD_TITLE"/>
+        <result property="contentMsg" column="CONTENT_MSG" jdbcType="CLOB" javaType="java.lang.String"/>
+        <result property="regUser" column="REG_USER"/>
+        <result property="regDt" column="REG_DT"/>
+        <result property="uptDt" column="UPT_DT"/>
+        <result property="readCnt" column="READ_CNT"/>
+        <result property="uptEmail" column="UPT_EMAIL"/>
+        <result property="atchFileId" column="ATCH_FILE_ID"/>
+        <result property="secretYn" column="SECRET_YN"/>
+        <result property="boardPwd" column="BOARD_PWD"/>
+        <result property="noticeYn" column="NOTICE_YN"/>
+        <result property="noticeToDt" column="NOTICE_TO_DT"/>
+        <result property="noticeFromDt" column="NOTICE_FROM_DT"/>
+        <result property="userPhone" column="USER_PHONE"/>
+        <result property="userName" column="USER_NAME"/>
+        <result property="regIp" column="REG_IP"/>
+        <result property="catId" column="CAT_ID"/>
+        <result property="catName" column="CAT_NAME"/>
+        <result property="lang" column="LANGUAGE"/>
+        <result property="replyYn" column="REPLY_YN"/>
+        <result property="replyTitle" column="REPLY_TITLE"/>
+        <result property="replyMsg" column="REPLY_MSG"/>
+        <result property="replyId" column="REPLY_ID"/>
+    </resultMap>
+
+    <select id="selectBoardMaster" parameterType="BoardVO" resultType="BoardVO">
+		SELECT
+		    	board_id,
+		    	board_name,
+		    	board_desc,
+		    	reply_yn,
+		    	use_yn,
+		        file_yn,
+		        comment_yn ,
+		        reg_yn,
+		        notice_vw_yn,
+		        notice_cnt,
+		        editor_yn,
+		        writer_yn,
+		        regdate_yn,
+		        newicon_yn,
+		        secret_use_yn,
+		        cat_view_yn,
+		        TO_CHAR(reg_dt, 'YYYY-MM-DD') as reg_dt
+	       FROM
+	        	TB_BOARD_MST
+	       WHERE
+	       	   board_id = #{boardId}
+	      AND use_yn = 'Y'
+	</select>
+    <select id="selectBoardList" parameterType="BoardVO" resultMap="boardMAP">
+        SELECT A.*
+        FROM (SELECT ROWNUM AS NO, TX.*
+        FROM ( SELECT *
+        FROM (SELECT t.board_id,
+        t.content_id,
+        t.board_title,
+        t. content_msg,
+        t.reg_user,
+        TO_CHAR(t.reg_date, 'YYYY-MM-DD') as reg_dt,
+        t.upt_email,
+        TO_CHAR(t.upt_dt, 'YYYY-MM-DD') as upt_dt,
+        t.read_cnt,
+        t.secret_yn,
+        t.board_pwd,
+        t.notice_yn,
+        t.notice_to_dt,
+        t.notice_from_dt,
+        t.reply_yn,
+        t2.reply_title,
+        DBMS_LOB.SUBSTR (t2.reply_msg, 1500)as reply_msg,
+        t2.reply_id,
+        t.cat_id,
+        t.language as lang,
+        t3.cat_name
+        FROM TB_BOARD t , TB_BOARD_REPLY t2 ,TB_BOARD_CAT_DETAIL t3
+        WHERE
+        t.board_id = #{boardId}
+        AND
+        t.content_id = t2.content_id(+)
+        AND
+        t.cat_id = t3.cat_id(+)
+        AND
+        t.use_yn = 'Y'
+        <if test="catId != null and catId != ''">
+            AND t.cat_id = #{catId}
+        </if>
+        <if test="regUser != null and regUser != ''">
+            AND t.reg_user = #{regUser}
+        </if>
+        <if test="stdDate != null and stdDate != ''">
+            AND t.reg_date BETWEEN TO_DATE(#{stdDate },'YYYY.MM.DD') AND TO_DATE(#{endDate },'YYYY.MM.DD') + 1
+        </if>
+        <if test="searchWrd != null and searchWrd != ''">
+            AND (t.board_title LIKE '%'||#{searchWrd }||'%' OR content_msg LIKE '%'||#{searchWrd }||'%')
+        </if>
+        AND t.language = #{lang}
+        ) ORDER BY reg_dt DESC , to_number(content_id) DESC
+        ) TX
+        ) A
+        WHERE
+        <choose>
+            <when test="mainYn != null and mainYn != ''">
+                A.NO BETWEEN 1 AND 3
+            </when>
+            <otherwise>
+                A.NO BETWEEN #{firstIndex} + 1 AND #{firstIndex} + #{recordCountPerPage}
+            </otherwise>
+        </choose>
+    </select>
+    <select id="getTotCount" parameterType="BoardVO" resultType="java.lang.Integer">
+        SELECT
+        COUNT(*)
+        FROM (
+        SELECT
+        * FROM (
+        SELECT t.board_id,
+        t.content_id,
+        t.board_title,
+        DBMS_LOB.SUBSTR (t. content_msg, 1500) content_msg,
+        t.reg_user,
+        TO_CHAR(t.reg_date, 'YYYY-MM-DD') as reg_dt,
+        t.upt_email,
+        TO_CHAR(t.upt_dt, 'YYYY-MM-DD') as upt_dt,
+        t.read_cnt,
+        t.secret_yn,
+        t.board_pwd,
+        t.notice_yn,
+        t.notice_to_dt,
+        t.notice_from_dt,
+        t.reply_yn,
+        t2.reply_title,
+        DBMS_LOB.SUBSTR (t2.reply_msg, 1500)as reply_msg,
+        t2.reply_id,
+        t.cat_id,
+        t.language as lang,
+        t3.cat_name
+        FROM TB_BOARD t , TB_BOARD_REPLY t2 ,TB_BOARD_CAT_DETAIL t3
+        WHERE
+        t.board_id = #{boardId}
+        AND
+        t.content_id = t2.content_id(+)
+        AND
+        t.cat_id = t3.cat_id(+)
+        AND
+        t.use_yn = 'Y'
+        <if test="catId != null and catId != ''">
+            AND t.cat_id = #{catId}
+        </if>
+        <if test="regUser != null and regUser != ''">
+            AND t.reg_user = #{regUser}
+        </if>
+        <if test="stdDate != null and stdDate != ''">
+            AND t.reg_date BETWEEN TO_DATE(#{stdDate },'YYYY.MM.DD') AND TO_DATE(#{endDate },'YYYY.MM.DD') + 1
+        </if>
+        <if test="searchWrd != null and searchWrd != ''">
+            AND (t.board_title LIKE '%'||#{searchWrd }||'%' OR content_msg LIKE '%'||#{searchWrd }||'%')
+        </if>
+        AND t.language = #{lang}
+        )ORDER BY reg_dt DESC
+        ) TX
+    </select>
+    <select id="getNoAnserCnt" parameterType="BoardVO" resultType="java.lang.Integer">
+        SELECT
+        COUNT(*)
+        FROM (
+        SELECT
+        * FROM (
+        SELECT t.board_id,
+        t.content_id,
+        t.board_title,
+        DBMS_LOB.SUBSTR (t. content_msg, 1500) content_msg,
+        t.reg_user,
+        TO_CHAR(t.reg_date, 'YYYY-MM-DD') as reg_dt,
+        t.upt_email,
+        TO_CHAR(t.upt_dt, 'YYYY-MM-DD') as upt_dt,
+        t.read_cnt,
+        t.secret_yn,
+        t.board_pwd,
+        t.notice_yn,
+        t.notice_to_dt,
+        t.notice_from_dt,
+        t.reply_yn,
+        t2.reply_title,
+        DBMS_LOB.SUBSTR (t2.reply_msg, 1500)as reply_msg,
+        t2.reply_id,
+        t.cat_id,
+        t.language as lang,
+        t3.cat_name
+        FROM TB_BOARD t , TB_BOARD_REPLY t2 ,TB_BOARD_CAT_DETAIL t3
+        WHERE
+        t.board_id = #{boardId}
+        AND
+        t.content_id = t2.content_id(+)
+        AND
+        t.cat_id = t3.cat_id(+)
+        AND
+        t.use_yn = 'Y'
+        AND
+        t.reply_yn = 'N'
+        <if test="catId != null and catId != ''">
+            AND t.cat_id = #{catId}
+        </if>
+        <if test="regUser != null and regUser != ''">
+            AND t.reg_user = #{regUser}
+        </if>
+        <if test="stdDate != null and stdDate != ''">
+            AND t.reg_date BETWEEN TO_DATE(#{stdDate },'YYYY.MM.DD') AND TO_DATE(#{endDate },'YYYY.MM.DD') + 1
+        </if>
+        <if test="searchWrd != null and searchWrd != ''">
+            AND (t.board_title LIKE '%'||#{searchWrd }||'%' OR content_msg LIKE '%'||#{searchWrd }||'%')
+        </if>
+        AND t.language = #{lang}
+        )ORDER BY reg_dt DESC
+        ) TX
+    </select>
+    <select id="selectBoardOne" parameterType="BoardVO" resultMap="boardMAP">
+		SELECT
+			 t1.board_id,
+	         t1.content_id,
+	         t1.board_title,
+	         t1.content_msg,
+	         t1.reg_user,
+	         TO_CHAR(t1.reg_date, 'YYYY-MM-DD') as reg_dt,
+	         t1.upt_dt,
+	         t1.upt_email,
+	         t1.atch_file_id,
+	         t1.reply_yn,
+	         t1.notice_yn,
+	         t1.user_phone,
+	         t1.user_name,
+	         t1.reg_ip,
+	         t1.cat_id,
+	         t2.cat_name,
+	         t1.language as lang
+		FROM
+		    TB_BOARD t1, TB_BOARD_CAT_DETAIL t2
+		WHERE
+            t1.cat_id = t2.cat_id(+)
+        AND
+			t1.board_id = #{boardId}
+		AND
+			t1.content_id = #{contentId}
+		AND
+			t1.USE_YN = 'Y'
+	</select>
+    <select id="selectBoardOption" parameterType="BoardVO" resultMap="boardMAP">
+       SELECT
+            t1.cat_mst_id,
+            t1.cat_id,
+            t2.cat_name
+        FROM
+            TB_BOARD_CAT_LIST t1 , TB_BOARD_CAT_DETAIL t2
+        WHERE
+            t1.cat_id = t2.cat_id
+        AND
+            t1.board_id =  #{boardId}
+        AND
+            t1.use_yn = 'Y'
+        AND
+        	t2.use_yn = 'Y'
+       ORDER BY cat_id
+    </select>
+
+    <select id="selectNttMax" resultType="java.lang.Integer">
+        SELECT to_char(NVL(MAX(to_number(content_id)),0)+1) AS content_id  FROM TB_BOARD
+    </select>
+
+    <insert id="insertBoardOne" parameterType="BoardVO">
+        INSERT INTO TB_BOARD(
+         content_id, board_id, board_title, content_msg
+        ,reg_user,  reply_yn, reg_date, use_yn
+        ,notice_yn, secret_yn ,user_phone , user_name , cat_id
+        ,reg_ip,language
+        )
+        VALUES(
+         #{contentId}, #{boardId}, #{boardTitle}, #{contentMsg}
+        ,#{regUser},  'N' , SYSDATE, 'Y'
+        , #{noticeYn}, 'N' ,#{userPhone}, #{userName} , #{catId}
+        ,#{regIp},#{lang}
+         )
+    </insert>
+
+
+    <update id="updateBoardOne" parameterType="BoardVO">
+         UPDATE TB_BOARD SET
+             board_title = #{boardTitle},
+             content_msg = #{contentMsg},
+             reg_user = #{regUser},
+             upt_email = #{regUser},
+             cat_id = #{catId},
+             user_phone = #{userPhone},
+             user_name = #{userName},
+             upt_ip = #{uptIp},
+             upt_dt = SYSDATE
+         WHERE board_id = #{boardId}
+         AND content_id = #{contentId}
+    </update>
+
+    <update id="insUptBoardOne" parameterType="BoardVO">
+        MERGE INTO TB_BOARD
+          USING DUAL
+        ON
+          (
+            content_id = #{contentId}
+            AND
+            reg_user   = #{regUser}
+            )
+        WHEN MATCHED THEN
+          UPDATE
+            SET
+            board_title =   #{boardTitle},
+            content_msg =   #{contentMsg},
+            UPT_EMAIL   =   #{regUser},
+            user_phone  =   #{userPhone},
+            cat_id = #{catId},
+            upt_ip = #{regIp},
+            upt_dt = SYSDATE
+        WHEN NOT MATCHED THEN
+            INSERT (
+            content_id, board_id, board_title, content_msg
+            ,reg_user,  reply_yn, reg_date, use_yn, user_phone, user_name
+            ,notice_yn, secret_yn ,cat_id, reg_ip,language
+          )
+            VALUES(
+            #{contentId}, #{boardId}, #{boardTitle}, #{contentMsg}
+            ,#{regUser},  'N' , SYSDATE, 'Y', #{userPhone} , #{userName}
+            ,#{noticeYn}, 'N' , #{catId} ,#{regIp},#{lang}
+          )
+    </update>
+
+    <update id="deleteBoard" parameterType="BoardVO">
+        UPDATE TB_BOARD SET
+            USE_YN = 'N',
+            upt_dt = SYSDATE
+        WHERE board_id = #{boardId}
+        AND content_id = #{contentId}
+   </update>
+
+    <select id="selectOption" parameterType="BoardVO" resultMap="boardMAP">
+       SELECT
+            t1.cat_mst_id,
+            t1.cat_id,
+            t2.cat_name
+        FROM
+            TB_BOARD_CAT_LIST t1 , TB_BOARD_CAT_DETAIL t2
+        WHERE
+            t1.cat_id = t2.cat_id
+        AND
+            t1.board_id =  #{boardId}
+        AND
+            t1.use_yn = 'Y'
+        AND
+        	t2.use_yn = 'Y'
+        AND t1.cat_id = #{catId}
+       ORDER BY cat_id
+    </select>
+
+    <select id="selectFileSn" parameterType="String" resultType="String">
+		SELECT
+			NVL(MAX(FILE_SN),0) AS FILE_SN
+		FROM LETTNFILEDETAIL
+		WHERE ATCH_FILE_ID =  #{atchFileId}
+ 	</select>
+
+    <select id="selectQuestion" parameterType="BoardVO" resultMap="boardMAP">
+		SELECT
+			 t1.board_id,
+	         t1.content_id,
+	         t1.board_title,
+	         t1.content_msg,
+	         t1.reg_user,
+	         TO_CHAR(t1.reg_date, 'YYYY-MM-DD') as reg_dt,
+	         t1.upt_dt,
+	         t1.upt_email,
+	         t1.atch_file_id,
+	         t1.reply_yn,
+	         t1.notice_yn,
+	         t1.user_phone,
+	         t1.user_name,
+	         t1.reg_ip,
+	         t1.cat_id,
+	         t2.cat_name,
+	         t1.language as lang
+		FROM
+		    TB_BOARD t1, TB_BOARD_CAT_DETAIL t2
+		WHERE
+            t1.cat_id = t2.cat_id(+)
+        AND
+			t1.board_id = 'BDMT_000000000003'
+		AND
+			t1.content_id = #{contentId}
+        AND
+            t1.reg_user = #{regUser}
+	</select>
+</mapper>

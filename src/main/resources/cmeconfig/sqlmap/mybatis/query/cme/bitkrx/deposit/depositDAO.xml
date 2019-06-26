@@ -1,0 +1,580 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="depositDAO">
+	
+	<resultMap id="depositMap" type="hashmap"/>
+	
+	<update id="INS30171020" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INSUPT30171020(
+			'',
+			#{crgPrc		,mode=IN,jdbcType=VARCHAR},
+			#{payKndCd		,mode=IN,jdbcType=VARCHAR},
+            #{krxActCode	,mode=IN,jdbcType=VARCHAR},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+            #{trnId			,mode=IN,jdbcType=VARCHAR},
+            #{atmKey        ,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+	
+	<update id="INS10171029" parameterType="hashmap" statementType="CALLABLE">
+		{ call PRI_INS10171029(
+			'',
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{crgPrc		,mode=IN,jdbcType=VARCHAR},
+			0,
+			0,
+			0,
+			0,
+			#{cnclPrc		,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+
+	<update id="INSUPT30171030" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INSUPT30171030(
+			#{cnDptCode		,mode=IN,jdbcType=VARCHAR},
+			#{cnAmt			,mode=IN,jdbcType=VARCHAR},
+			#{curcyCd		,mode=IN,jdbcType=VARCHAR},
+			#{dptKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+			#{dealNo		,mode=IN,jdbcType=VARCHAR},
+			#{sndWletAdr	,mode=IN,jdbcType=VARCHAR},
+			'',
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+	
+	<update id="INS10171028" parameterType="hashmap" statementType="CALLABLE">
+		{ call PRI_INS10171028(
+			'',
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{cnAmt			,mode=IN,jdbcType=VARCHAR},
+			0,
+			0,
+			0,
+			#{cnclAmt			,mode=IN,jdbcType=VARCHAR},
+			#{curcyCd		,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+	
+	<select id="getCnDptCode" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.DepositVO">
+		SELECT 
+		    T1.CN_AMT CNAMT, 
+            T1.CN_DPT_CODE CNDPTCODE,
+            T2.CN_DPT_CODE CNDPTCODE2
+        FROM TB_30171030 T1, TB_30171031 T2
+        WHERE
+            T1.CN_DPT_CODE = T2.CN_DPT_CODE(+)
+        AND
+			USER_EMAIL = #{userEmail}
+		AND
+			UPPER(DEAL_NO) = UPPER(#{dealNo})
+        AND
+            ROWNUM = 1
+	</select>
+	
+	<insert id="insAccInfo" parameterType="com.bitkrx.api.trade.vo.DepositVO">
+		insert into TB_30171000 
+			(WLET_ADR, WLET_KND_CD, REG_EMAIL, REG_DT, REG_IP, USER_EMAIL, DESTI_TAG , PRIVATEKEY)
+		VALUES 
+			( #{accNo}, #{curcyCd}, #{userEmail} , sysdate, #{regIp}, #{userEmail}, #{destinationTag} , #{privateKey})
+	</insert>
+
+    <select id="getBmcCoinCnt" parameterType="String" resultType="int">
+        SELECT COUNT(*) FROM TB_30171000 WHERE WLET_ADR = #{value}
+    </select>
+	
+	<select id="getDestinationTag" resultType="String">
+		SELECT SEQ_DESTI_TAG.NEXTVAL FROM DUAL
+	</select>
+	
+	<select id="getCnAccInfo" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.DepositVO">
+		SELECT 
+			WLET_ADR WLETADR, DESTI_TAG DESTINATIONTAG
+		FROM 
+			TB_30171000
+		WHERE
+			USER_EMAIL = #{userEmail}
+		AND
+			WLET_KND_CD = #{curcyCd}
+	</select>
+	
+	<select id="getCnAccList" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.CnAccListVO">
+
+
+       SELECT
+            T1.CURCYCD,
+            T1.CURCYNM,
+            T2.WLET_ADR ACCNO,
+            T2.DESTI_TAG DESTITAG,
+            T2.PRIVATEKEY PRIVATEKEY
+        FROM
+            (SELECT CMM_CD CURCYCD , CMM_SN CMMSN , CMM_NM CURCYNM FROM TB_30171021 WHERE CMM_UPPER_CD = 'CMMP00000000043' AND USE_YN = 'Y' AND CMM_CD NOT IN 'CMMC00000000248') T1,
+            (SELECT * FROM TB_30171000 WHERE ROWID IN (SELECT
+                                                           MAX(ROWID)
+                                                       FROM TB_30171000 WHERE USER_EMAIL = #{userEmail} GROUP BY WLET_KND_CD)) T2
+        WHERE T1.CURCYCD = T2.WLET_KND_CD(+)
+        ORDER BY CMMSN
+	</select>
+	
+	<select id="getCnDepoList" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.CoinDepositVO">
+		SELECT  TT.*,
+	        CASE 
+	            WHEN COMPDT IS NULL
+	            THEN 'N'
+	            ELSE 'Y'
+	        END STATE FROM(
+	    SELECT 
+	        TO_CHAR(REG_DT,'YYYY/MM/DD HH24:MI:SS') REQDT,
+	        CN_KND_CD CURCYCD,
+	        RTRIM(TO_CHAR(CN_AMT,'FM99999999990.99999999'),'.') CNAMT,
+	        (SELECT TO_CHAR(UPT_DT,'YYYY/MM/DD HH24:MI:SS') FROM TB_30171031 WHERE T.CN_DPT_CODE = CN_DPT_CODE) COMPDT,
+	        CASE
+                WHEN IN_GUBUN = 'L' THEN 'LD'
+                WHEN IN_GUBUN = 'X' THEN 'X'
+                WHEN IN_GUBUN = 'E' THEN 'E'
+                ELSE 'D'
+             END EXFLAG
+	    FROM TB_30171030 T
+	    WHERE
+	        DPT_KND_CD IN ('CMMC00000000014', 'CMMC00000000283')
+	    AND
+	        USER_EMAIL = #{userEmail}
+	        ORDER BY REG_DT DESC ) TT
+	</select>
+	
+	<select id="getUserAccNm" parameterType="String" resultType="com.bitkrx.api.trade.vo.DepositUserInfoVO">
+		SELECT
+			CASE WHEN
+			LENGTH(USER_NM) = 4 THEN USER_NM || SUBSTR(USER_MOBILE , -3)
+			ELSE USER_NM || SUBSTR(USER_MOBILE , -4)
+			END
+			AS USERACCNM
+		FROM
+			TB_10171020
+		WHERE
+			USER_EMAIL = #{value}
+	</select>
+	
+	<select id="getUserBankInfo" parameterType="String" resultType="com.bitkrx.api.trade.vo.DepoBankVO">
+
+          SELECT T.*
+                FROM(
+                    SELECT
+                                T1.KRX_ACT_CODE KRXACTCODE, /*거래소 계좌코드*/
+                                T1.BANK_CD BANKCD, /*은행코드*/
+                                T2.NBANK_NM AS BANKNM, /*은행명*/
+                                T1.ACT_NM ACCNM, /*예금주*/
+                                T1.USE_YN, /*사용여부*/
+                                T1.BANK_NO ACCNO
+                            FROM
+                                TB_10171037 T1, /* 거래소 계좌 */
+                                TB_501710051 T2 /* 국가은행코드 */
+                            WHERE
+                                T1.BANK_CD = T2.NBANK_CODE
+                                AND T1.USE_YN = 'Y'
+                            ORDER BY T1.REG_DT DESC
+            )T
+
+	</select>
+	
+	<update id="compDepo" parameterType="String">
+		UPDATE 
+			TB_30171030 
+		SET 
+			DPT_KND_CD = 'CMMC00000000283' 
+		WHERE 
+			CN_DPT_CODE = #{dptKndCd}
+	</update>
+	
+	<select id="getKrwDepoList" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.KrwDepositVO">
+        SELECT
+            T1.REG_DT REQDT,
+            T1.PAY_KND_CD PAYKNDCD,
+            NVL(T1.CRG_PRC , 0) CRGPRC,
+            'Y' STATE,
+            T1.REG_DT COMPDT,
+            T2.IN_CRY_CODE INCRYCODE,
+            NVL(T2.IN_AMT , 0) INAMT,
+            T2.EX_RATE EXRATE,
+            T2.EX_CRY_CODE EXCRYCODE,
+            T2.CARD_NO CARDNUM,
+            NVL(T2.DPT_FEE , 0) DPTFEE
+        FROM TB_30171020 T1, TB_40171014 T2
+        WHERE PAY_KND_CD IN ('CMMC00000000040','CMMC00000000039','CMMC00000000011','CMMC00000000805')
+        AND T1.TRN_ID = T2.TRN_ID(+)
+        AND T1.USER_EMAIL = #{userEmail}
+        <if test="payKndCd != '' ">
+        AND PAY_KND_CD = #{payKndCd}
+        </if>
+        ORDER BY T1.REG_DT DESC , T1.PAY_KND_CD DESC
+	</select>
+	
+	<select id="getKrwWithdrow" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.KrwWithVO">
+
+        WITH USERNATN AS (
+            SELECT * FROM TB_50171003 WHERE NATN_CODE =
+                (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                     (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+        SELECT
+            --NVL(T1.REM_MNY - FN_GETPNT(T1.USER_EMAIL), 0) KRWPRC,
+            --NVL(T1.REM_MNY - FN_GETPNT(T1.USER_EMAIL), 0)
+            NVL(FN_OUT_PASS_PRC(T1.USER_EMAIL), 0) KRWPRC,
+            NVL(FN_OUT_PASS_PRC(T1.USER_EMAIL), 0)
+            -
+            (SELECT NVL(SUM(NVL(CRG_PRC,0)),0) FROM TB_30171020
+            WHERE REG_DT >= (SYSDATE-2) AND USER_EMAIL = #{userEmail} AND PAY_KND_CD = 'CMMC00000000805') KRWPRCCARD,
+            (SELECT NBANK_NM FROM TB_501710051 WHERE NBANK_CODE = T2.BANK_CD) BANKNM,
+            T2.BANK_ACC_NO BANKACCNO,
+            T2.BANK_CD BANKCD,
+            T2.ACCNT_NM ACCNTNM,
+            (SELECT CRY_CODE FROM USERNATN) CRYCODE,
+            (SELECT MAX(EX_RATE) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) FROM TB_50171011 WHERE CRY_CODE = (SELECT CRY_CODE FROM USERNATN)) EXRATE,
+            T2.CERT_YN CERTYN,
+            T2.USE_YN USEYN
+        FROM VW_MNY_INFO T1, (SELECT * FROM TB_10171022 WHERE USE_YN = 'Y') T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL(+)
+        AND T1.USER_EMAIL = #{userEmail}
+
+    </select>
+
+	<insert id="insCoinMoveHis" parameterType="com.bitkrx.api.trade.vo.DepositVO">
+		INSERT INTO
+		  TB_30171032
+			(CN_MV_CODE,/*무브코드*/
+			  CN_DPT_CODE,/*입금코드*/
+			  USER_EMAIL,
+			  BIZ_WLET_ADR,/*거래소지갑주소*/
+			  CN_KND_CD,/*코인코드*/
+			  CN_AMT,/*코인개수*/
+			  SF_YN,/*성공여부*/
+			  DEAL_NO,/*txid*/
+			  MEMO,
+			  REG_EMAIL,
+			  REG_DT,
+			  REG_IP  )
+		VALUES
+			( FN_GEN_KEY('TB_30171032', 'CN_MV_CODE', ''),
+			  #{cnDptCode},
+			  #{userEmail},
+			  #{sndWletAdr},
+			  #{cnKndCd},
+			  #{cnAmt},
+			  #{sfYn},
+			  #{dealNo},
+			  #{memo},
+			  #{userEmail},
+			  SYSDATE,
+			  #{regIp}    )
+	</insert>
+
+    <select id="getTxidCount" parameterType="String" resultType="int">
+
+        SELECT COUNT(*) FROM TB_30171000 WHERE WLET_ADR = #{dealNo}
+
+    </select>
+
+    <select id="selectWletUserInfo" parameterType="com.bitkrx.api.trade.vo.WletUserInfoVO" resultType="com.bitkrx.api.trade.vo.WletUserInfoVO">
+
+        SELECT
+            T1.WLET_ADR WLETADR,
+            T2.CN_KND_CD CNKNDCD,
+            FN_CMM_CD(T2.CN_KND_CD, '') CNKNDNM,
+            T1.USER_EMAIL USEREMAIL,
+            RTRIM(TO_CHAR(T2.TOT_AMT,'FM99999999990.99999999'), '.') TOTAMT,
+            RTRIM(TO_CHAR(T2.POS_AMT,'FM99999999990.99999999'), '.') POSAMT,
+            RTRIM(TO_CHAR(T2.USE_AMT,'FM99999999990.99999999'), '.') USEAMT
+        FROM
+            TB_30171000 T1, VW_CN_AMT T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL
+              AND T1.WLET_KND_CD = T2.CN_KND_CD
+              AND UPPER(T1.WLET_ADR) = UPPER(#{wletAdr})
+    </select>
+
+
+    <select id="getExRateDepositPrc" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.DepositVO">
+
+        SELECT
+            ROUND(#{crgPrc} / MAX(EX_RATE) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC), 2) CRGPRC,
+            MAX(CRY_CODE) EXCRYCODE,
+            ROUND(MAX(EX_RATE) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC), 2) EXRATE
+        FROM TB_50171011
+        WHERE CRY_CODE =
+              (SELECT CRY_CODE FROM TB_50171003 WHERE NATN_CODE =
+                                                      (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                                                                                               (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+
+    </select>
+
+
+    <select id="getTrnGenKey" resultType="String">
+
+        SELECT FN_GEN_KEY('TB_40171014','TRN_CODE','') FROM DUAL
+
+    </select>
+
+
+    <insert id="insTrnInfo" parameterType="com.bitkrx.api.trade.vo.TrnInfoVO">
+        INSERT INTO TB_40171014
+        (TRN_ID, TRN_DT, TRN_DV, REG_DT,
+        TRN_STATE, COMPANY_ACCT, USER_EMAIL, IN_CRY_CODE,
+        EX_RATE, EX_CRY_CODE, IN_AMT, CARD_NO, DPT_FEE)
+        VALUES
+        (#{genKey} , TO_CHAR(SYSDATE, 'YYYY.MM.DD'), '선불카드', SYSDATE,
+        NVL(#{status}, '02'), #{compCode}, #{userEmail}, #{exCryCode},
+        #{exRate}, 'KRW', #{crgPrc}, #{cardNo}, #{dptFee})
+    </insert>
+
+
+    <update id="cardCoinOut" parameterType="com.bitkrx.api.trade.vo.DepositVO">
+
+        UPDATE
+            TB_10171028
+        SET
+            UPT_DT       =   SYSDATE,
+            TOT_AMT      =   TOT_AMT - #{cnAmt}
+        WHERE
+            USER_EMAIL  =   #{userEmail}
+        AND
+            CN_KND_CD   =   #{curcyCd}
+    </update>
+
+    <update id="cardCoinIn" parameterType="com.bitkrx.api.trade.vo.DepositVO">
+        UPDATE
+            TB_10171028
+        SET
+            UPT_DT       =    SYSDATE,
+            TOT_AMT      =    TOT_AMT + #{cnAmt}
+        WHERE
+            USER_EMAIL   =    'cmaster@planbit.io'
+        AND
+            CN_KND_CD    =    #{curcyCd}
+    </update>
+
+    <select id="getCardCoinOutKey" resultType="String">
+
+        SELECT FN_GEN_KEY('TB_50171035', 'CRD_CN_SND_CODE', '') FROM DUAL
+
+    </select>
+
+    <select id="getCardCoinInKey" resultType="String">
+
+        SELECT FN_GEN_KEY('TB_50171037','PTM_COIN_OUT_CODE','') FROM DUAL
+
+    </select>
+
+    <update id="cardCashOut" parameterType="com.bitkrx.api.trade.vo.DepositVO">
+
+        UPDATE
+            TB_10171029
+        SET
+            UPT_DT       =   SYSDATE,
+            TOT_MNY      =   TOT_MNY - #{cnAmt}
+        WHERE
+            USER_EMAIL  =   #{userEmail}
+    </update>
+
+    <update id="insUptCardUseInfo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        MERGE INTO TB_50171035
+        USING DUAL ON(CRD_CN_SND_CODE = #{tradeId})
+        WHEN NOT MATCHED THEN
+        INSERT
+        (CRD_CN_SND_CODE, CN_KND_CD, USER_EMAIL,
+         STATUS, CRD_CN_SND_AMT, EX_RATE,
+         USE_PRC, FEE_AMT, CN_PRC,
+         REG_EMAIL, REG_DT, REG_IP, ATM_MCH_KEY, CARD_NO)
+        VALUES
+        (#{tradeId}, #{curcyCd}, #{userEmail},
+         #{status}, #{cnAmt}, #{exRate},
+         #{usePrc}, #{feeAmt}, #{cnPrc},
+         #{userEmail}, SYSDATE, #{regIp}, #{atmKey}, #{cardNum})
+        WHEN MATCHED THEN
+        UPDATE SET
+         STATUS = #{status},
+         UPT_EMAIL = #{userEmail},
+         UPT_DT = SYSDATE,
+         UPT_IP = #{regIp}
+
+    </update>
+
+    <select id="selectCardCoinUseInfo" parameterType="String" resultType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        SELECT
+            CN_KND_CD CURCYCD,
+            USER_EMAIL USEREMAIL,
+            STATUS,
+            CRD_CN_SND_AMT CNAMT
+        FROM
+            TB_50171035
+        WHERE
+            CRD_CN_SND_CODE = #{value}
+
+    </select>
+
+    <select id="getTotUsdtAmt" resultType="double">
+        SELECT
+            NVL((SELECT SUM(CN_AMT) FROM TB_30171030 WHERE CN_KND_CD = 'CMMC00000001086'), 0)
+            -
+            NVL((SELECT SUM(WDR_REQ_AMT) FROM TB_20171023 WHERE CN_KND_CD = 'CMMC00000001086' AND STATUS = 'CMMC00000000099'), 0)
+        FROM DUAL
+    </select>
+    
+    <select id="getKrwPoint" parameterType="String" resultType="String">
+        SELECT
+          FN_OUT_PASS_PRC(#{value})
+        FROM DUAL
+    </select>
+
+    <insert id="insMoaCardHistory" parameterType="com.bitkrx.api.moaCard.vo.MoaCardCoinVO">
+        INSERT INTO TB_50171037
+        (PTM_COIN_OUT_CODE , CN_KND_CD , USE_AMT ,
+        CN_PRC , OUT_PRC , FEE_AMT , USER_EMAIL ,
+        ATM_MCH_KEY , CARD_NO , REG_EMAIL , REG_DT , REG_IP)
+        VALUES
+        (#{ptmCoinOutCode} , #{cnKndCd} , #{useAmt},
+        #{cnPrc} , #{outPrc} , #{feeAmt} , 'cmaster@planbit.io',
+        #{atmMchKey} , #{cardNo} , #{userEmail} , SYSDATE , #{regIp})
+    </insert>
+
+    <select id="getCoinMoveHourCnt" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="int">
+        SELECT COUNT(1) FROm TB_30171032
+        WHERE USER_EMAIL = #{userEmail}
+        AND CN_KND_CD = #{cnKndCd}
+        AND REG_DT <![CDATA[ >  ]]> SYSDATE - 1/24
+    </select>
+
+    <select id="getUserAccInfo" parameterType="String" resultType="com.bitkrx.api.trade.vo.KrwWithVO">
+         WITH USERNATN AS (
+            SELECT * FROM TB_50171003 WHERE NATN_CODE =
+                (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                     (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+        SELECT
+            T2.BANK_ACC_NO BANKACCNO,
+            T2.BANK_CD BANKCD,
+            T2.ACCNT_NM ACCNTNM,
+            (SELECT CRY_CODE FROM USERNATN) CRYCODE,
+            (SELECT MAX(EX_RATE) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) FROM TB_50171011 WHERE CRY_CODE = (SELECT CRY_CODE FROM USERNATN)) EXRATE,
+            (SELECT USER_MOBILE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail}) USERMOBILE
+        FROM VW_MNY_INFO T1, (SELECT * FROM TB_10171022 WHERE USE_YN = 'Y') T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL(+)
+        AND T1.USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getDepositUserEmail" resultType="String">
+
+        SELECT
+            DISTINCT T1.USER_EMAIL
+        FROM(
+            -- 유저, 코인별 최근 마지막 입금 내역
+            SELECT
+                USER_EMAIL, CN_KND_CD,
+                MAX(REG_DT) KEEP (DENSE_RANK FIRST ORDER BY CN_DPT_CODE DESC) REG_DT
+            FROM TB_30171030
+            GROUP BY USER_EMAIL, CN_KND_CD
+            ORDER BY REG_DT DESC) T1,
+            -- 유저, 코인별 최근 마지막 머지 성공 내역
+            (SELECT
+                 USER_EMAIL, CN_KND_CD,
+                 MAX(REG_DT) KEEP (DENSE_RANK FIRST ORDER BY CN_MV_CODE DESC) REG_DT
+             FROM TB_30171032
+             WHERE SF_YN = 'Y'
+             GROUP BY USER_EMAIL, CN_KND_CD
+             ORDER BY REG_DT DESC) T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL(+)
+        AND T1.CN_KND_CD = T2.CN_KND_CD(+)
+        AND T1.REG_DT <![CDATA[ >  ]]> T2.REG_DT(+)
+        AND T1.REG_DT <![CDATA[ >  ]]> SYSDATE - 7
+
+    </select>
+
+    <select id="getCoinCode" parameterType="String" resultType="String">
+      SELECT
+        CMM_CD
+      FROM TB_30171021
+        WHERE CMM_DESC = #{value}
+        AND USE_YN = 'Y'
+      AND ROWNUM = 1
+    </select>
+
+    <select id="getWletUserEmail" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="String">
+      SELECT USER_EMAIL FROM TB_30171000
+      WHERE UPPER(WLET_ADR) = UPPER(#{wletAdr})
+        AND WLET_KND_CD = #{cnKndCd}
+        <if test="destinationTag != null and destinationTag != '' ">
+            AND
+            DESTI_TAG = #{destinationTag}
+        </if>
+       AND ROWNUM = 1
+    </select>
+
+    <select id="getDepositCheckCnt" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_30171030
+        WHERE UPPER(DEAL_NO) = UPPER(#{txId})
+        AND UPPER(SND_WLET_ADR) = UPPER(#{wletAdr})
+    </select>
+
+    <update id="PR_INTUPT_ADM_EVENT_CHECK" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INTUPT_ADM_EVENT_CHECK(
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+
+    <select id="getEventCnt" resultType="int">
+        SELECT
+          COUNT(*)
+        FROM
+          TB_EVENT_ADM_COUPON
+        WHERE
+          USE_YN = 'N'
+    </select>
+
+    <select id="getEventInfo" parameterType="int" resultType="com.bitkrx.api.trade.vo.AdmEventVO">
+         SELECT TT.*
+          FROM (SELECT ROWNUM AS NO, T.* FROM(
+            SELECT
+                T1.CN_CPN_CODE CNCPNCODE,
+                T1.CN_EVT_CODE CNEVTCODE,
+                T1.USE_YN USEYN,
+                T1.REG_DT REGDT,
+                T2.GIVE_AMT GIVEAMT
+              FROM
+                TB_EVENT_ADM_COUPON T1 , TB_EVENT_ADM T2
+                WHERE T1.CN_EVT_CODE = T2.CN_EVT_CODE
+                AND T1.USE_YN = 'N'
+        ORDER BY T1.CN_CPN_CODE) T ) TT WHERE NO = #{value}
+    </select>
+
+    <update id="PR_INTUPT_ADM_EVENT" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INTUPT_ADM_EVENT(
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{cnCpnCode		,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=depositMap} ) }
+	</update>
+
+    <select id="getAdmEventList" parameterType="com.bitkrx.api.trade.vo.AdmEventVO" resultType="com.bitkrx.api.trade.vo.AdmEventVO">
+        SELECT TT.*
+        FROM(SELECT ROWNUM AS NO , T.* FROM(
+        SELECT
+            TO_CHAR(T1.REG_DT , 'YYYY-MM-DD HH24:MI:SS') GIVEDT ,
+            (SELECT GIVE_AMT FROM TB_EVENT_ADM WHERE CN_EVT_CODE = T1.CN_EVT_CODE) GIVEAMT
+        FROM
+            TB_EVENT_ADM_HIST T1
+        WHERE
+            T1.USER_EMAIL = #{userEmail}
+        ORDER BY T1.REG_DT DESC) T ) TT
+        WHERE NO BETWEEN #{firstIndex} + 1  AND #{firstIndex} + #{recordCountPerPage}
+    </select>
+
+    <select id="getAdmEventListCnt" parameterType="String" resultType="int">
+      SELECT
+          COUNT(*)
+      FROM
+          TB_EVENT_ADM_HIST
+      WHERE
+          USER_EMAIL = #{value}
+    </select>
+</mapper>

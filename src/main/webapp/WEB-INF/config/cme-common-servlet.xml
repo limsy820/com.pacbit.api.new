@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    - DispatcherServlet application context for Application's web tier.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans" 
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:mvc="http://www.springframework.org/schema/mvc"
+        xmlns:p="http://www.springframework.org/schema/p" 
+        xmlns:util="http://www.springframework.org/schema/util"
+        xmlns:context="http://www.springframework.org/schema/context"
+        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+				http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd		
+                http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+                http://www.springframework.org/schema/util
+      			http://www.springframework.org/schema/util/spring-util-3.2.xsd">
+
+    <!--
+        - The controllers are autodetected POJOs labeled with the @Controller annotation.
+    -->
+    <!-- 패키지 내 Controller, Service, Repository 클래스의 auto detect를 위한 mvc 설정 -->
+    <context:component-scan base-package="com.bitkrx">
+        <context:include-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Service"/>
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Repository"/>
+    </context:component-scan>
+    <context:annotation-config/>
+
+	<!-- <mvc:resources mapping="/html/**" location="/WEB-INF/html_src/" /> -->
+	<!--
+        - The form-based controllers within this application provide @RequestMapping 
+        - annotations at the type level for path mapping URLs and @RequestMapping 
+        - at the method level for request type mappings (e.g., GET and POST). 
+        - In contrast, ClinicController - which is not form-based - provides 
+        - @RequestMapping only at the method level for path mapping URLs.
+        -
+        - DefaultAnnotationHandlerMapping is driven by these annotations and is 
+        - enabled by default with Java 5+.
+    -->
+
+    <!--
+        - This bean processes annotated handler methods, applying Application-specific PropertyEditors
+        - for request parameter binding. It overrides the default AnnotationMethodHandlerAdapter.
+     -->
+    <mvc:annotation-driven />
+
+    <!-- ReqeustMapping 과 Controller 클래스 매핑을 위한 annotation mvc 설정 -->
+    <bean class="org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping"/>
+
+ <!-- 컨트롤러에서 넘어온 데이터(JSON 같은)를 messageConverter로 사용할 수 있는 방법 2 -->
+    <bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">
+        <property name="messageConverters">
+            <util:list list-class="java.util.ArrayList">
+                <ref bean="mappingJackson2HttpMessageConverter"/>
+            </util:list>
+        </property>
+    </bean>
+    
+    <bean id="mappingJackson2HttpMessageConverter" class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+        <property name="supportedMediaTypes">
+            <list>
+                <value>text/html;charset=UTF-8</value>
+                <value>application/json;charset=UTF-8</value>
+            </list>
+        </property>
+    </bean>
+
+	<!-- 자동 병경 서비스 ex) 데이트 타입을 원하는 형태로 변경하여 \들어옴
+	<bean id="conversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+ 		<property name="converters">
+			<set>
+				<bean class="cme.com.web.common.util.StringToDateConverter"/>
+			</set>
+		</property>
+	</bean> -->
+    
+	<bean class="org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerExceptionResolver" />
+	
+    <!-- 화면처리용 JSP 파일명의  prefix, suffix 처리에 대한 mvc 설정  -->
+    <bean class="org.springframework.web.servlet.view.UrlBasedViewResolver" p:order="1" 
+    p:viewClass="org.springframework.web.servlet.view.JstlView" 
+    p:prefix="/WEB-INF/jsp/" p:suffix=".jsp"/>
+
+    <!-- http://wiki.gurubee.net/display/LECTURE/01.XmlViewResolver 
+    <bean class="org.springframework.web.servlet.view.XmlViewResolver">
+	   <property name="location">
+	       <value>/WEB-INF/config/dmexcel/dm-excel-view.xml</value>
+	   </property>
+	   <property name="order" value="0" />
+	</bean> -->
+    
+    <bean class="org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping">
+    	<property name="useDefaultSuffixPattern" value="false"/>
+    </bean>
+
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <property name="maxUploadSize" value="10000000" />
+    </bean>
+	<!-- 다국어 message  -->
+    <bean id="messageSource" class="org.springframework.context.support.ReloadableResourceBundleMessageSource"
+          p:basename="classpath:/message/message-common">
+        <property name="defaultEncoding" value="UTF-8" />
+    </bean>
+
+	
+	<!-- localResolver 지정하지 않으면 브라우저에 세팅된 언어로 적용된다. -->
+	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.SessionLocaleResolver">
+		<property name="defaultLocale" value="ko" />
+	</bean>
+	<!-- ex) 호출방법  http://localhost/home/?lang=ko  -->
+	<mvc:interceptors>
+    	<bean id="localeChangeInterceptor" class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor">
+    		<property name="paramName" value="lang" />
+    	</bean>
+    </mvc:interceptors>
+    
+    <bean id="CmeTagFilter" class="com.bitkrx.config.filter.CmeCommonTagFilter"/>  
+    
+    
+</beans>

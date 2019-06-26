@@ -1,0 +1,711 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="loginDAO">
+	
+
+<select id="login" parameterType="loginVO" resultType="loginResVO">
+		
+		SELECT T.* FROM (  
+            SELECT 
+                   TB1.USER_EMAIL USEREMAIL,
+                   TB1.USER_NM USERNM,
+                   TB1.USER_MOBILE USERMOBILE,
+                   TB1.PWD_CHG_YN PWDCHGYN,
+                   NVL(TB2.EMAIL_CERT_YN, 'N') EMAILCERTYN,
+                   TB3.BLCK_YN BLCKYN,
+                   TB3.REL_YN RELYN,
+                   NVL(TB2.OTP_SERIAL,'') OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') SMSCERTYN,
+                   TB1.USE_YN USEYN,
+                   NVL(TB1.LOCK_YN, 'N') LOCKYN,
+                   NVL(LANG_CD, 'en') LANGCD,
+                   CERT_YN ACCCERTYN
+              FROM 
+                  TB_10171020 TB1, TB_10171021 TB2, VW_USER_BLCK_INFO TB3, TB_10171022 TB4
+             WHERE     
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB3.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND 
+		        TB1.USER_EMAIL = #{userEmail }
+		    AND 
+				TB1.USER_PWD = #{userPwd }
+            ORDER BY TB3.BLK_DT DESC ) T 
+        WHERE ROWNUM = 1
+        
+</select>
+
+
+ <select id="pinlogin" parameterType="loginVO" resultType="loginResVO">
+    SELECT T.* FROM (
+            SELECT
+                   TB1.USER_EMAIL USEREMAIL,
+                   TB1.USER_NM USERNM,
+                   TB1.USER_MOBILE USERMOBILE,
+                   TB1.PWD_CHG_YN PWDCHGYN,
+                   NVL(TB2.EMAIL_CERT_YN, 'N') EMAILCERTYN,
+                   TB3.BLCK_YN BLCKYN,
+                   TB3.REL_YN RELYN,
+                   NVL(TB2.OTP_SERIAL,'') OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') SMSCERTYN,
+                   TB1.USE_YN USEYN,
+                   NVL(TB1.LOCK_YN, 'N') LOCKYN,
+                   NVL(LANG_CD, 'en') LANGCD
+              FROM
+                  TB_10171020 TB1, TB_10171021 TB2, VW_USER_BLCK_INFO TB3, TB_10171022 TB4
+             WHERE
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB3.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND
+		        TB1.USER_EMAIL = #{userEmail }
+            ORDER BY TB3.BLK_DT DESC ) T
+        WHERE ROWNUM = 1
+ </select>
+
+    <select id="fingerlogin" parameterType="loginVO" resultType="loginResVO">
+        SELECT T.* FROM (
+            SELECT
+                   TB1.USER_EMAIL USEREMAIL,
+                   TB1.USER_NM USERNM,
+                   TB1.USER_MOBILE USERMOBILE,
+                   TB1.PWD_CHG_YN PWDCHGYN,
+                   NVL(TB2.EMAIL_CERT_YN, 'N') EMAILCERTYN,
+                   TB3.BLCK_YN BLCKYN,
+                   TB3.REL_YN RELYN,
+                   NVL(TB2.OTP_SERIAL,'') OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') SMSCERTYN,
+                   TB1.USE_YN USEYN,
+                   NVL(TB1.LOCK_YN, 'N') LOCKYN,
+                   NVL(LANG_CD, 'en') LANGCD
+              FROM
+                  TB_10171020 TB1, TB_10171021 TB2, VW_USER_BLCK_INFO TB3, TB_10171022 TB4 , TB_101710204 TB5
+             WHERE
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB3.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND
+		        TB1.USER_EMAIL = #{userEmail }
+		     AND
+		        TB1.USER_EMAIL = TB5.USER_EMAIL
+		     AND
+		        TB5.DVCID = #{deviceCd}
+            ORDER BY TB3.BLK_DT DESC ) T
+        WHERE ROWNUM = 1
+    </select>
+
+	<select id="getUseYn" parameterType="loginVO" resultType="loginResVO">
+
+		SELECT T.* FROM (
+            SELECT
+                   TB1.USER_EMAIL USEREMAIL,
+                   TB1.USER_NM USERNM,
+                   TB1.USER_MOBILE USERMOBILE,
+                   TB1.PWD_CHG_YN PWDCHGYN,
+                   NVL(TB2.EMAIL_CERT_YN, 'N') EMAILCERTYN,
+                   TB3.BLCK_YN BLCKYN,
+                   TB3.REL_YN RELYN,
+                   NVL(TB2.OTP_SERIAL,'') OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') SMSCERTYN,
+                   TB1.USE_YN USEYN,
+                   NVL(TB1.LOCK_YN, 'N') LOCKYN,
+                   NVL(LANG_CD, 'en') LANGCD
+              FROM
+                  TB_10171020 TB1, TB_10171021 TB2, VW_USER_BLCK_INFO TB3, TB_10171022 TB4
+             WHERE
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB3.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND
+		        TB1.USER_EMAIL = #{userEmail }
+            ORDER BY TB3.BLK_DT DESC ) T
+        WHERE ROWNUM = 1
+
+</select>
+
+<select id="isBlockYn" parameterType="String" resultType="int">
+	SELECT COUNT(1) FROM(
+	    SELECT * FROM(    
+	        SELECT * FROM VW_USER_BLCK_INFO 
+	        WHERE USER_EMAIL = #{userEmail}
+	        ORDER BY BLK_DT DESC)
+	    WHERE ROWNUM = 1)
+	WHERE BLCK_YN = 'Y' AND REL_YN = 'N'
+</select>
+
+<select id="getUserAuth" parameterType="loginVO" resultType="com.bitkrx.api.auth.vo.UserAuthVO">
+		
+		SELECT T.* FROM (  
+            SELECT 
+                   NVL(TB2.EMAIL_CERT_YN, 'N') AS EMAILCERTYN,
+                   NVL(TB2.OTP_SERIAL,'') AS OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') AS ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') AS SMSCERTYN,
+                    TB2.KYC_CERT_YN AS KYCCERTYN,
+                    TB2.KYC_UPT_EMAIL AS KYCUPTEMAIL,
+                    NVL(TB2.OTP_CERT_YN , 'N') AS OTPCERTYN,
+                    CERT_YN AS ACCCERTYN,
+                    NVL(TB2.USER_INFO_YN , '') USERINFOYN
+             FROM
+                  TB_10171020 TB1, TB_10171021 TB2, TB_10171022 TB4
+             WHERE     
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND
+		        TB1.user_email = #{userEmail }) T
+        WHERE ROWNUM = 1
+        
+</select>
+
+<select id="getEmailCnt" parameterType="loginVO" resultType="int">
+		
+	SELECT 
+        COUNT(TB1.USER_EMAIL)
+      FROM 
+          TB_10171020 TB1
+     WHERE     
+        TB1.user_email = #{userEmail }
+</select>
+
+<select id="getUserMobile" parameterType="String" resultType="String">
+	select 
+		USER_MOBILE
+	from 
+		TB_10171020
+    where 
+		user_email = #{userEmail }
+</select>
+
+<select id="getUserPuchCd" parameterType="String" resultType="String">
+	select 
+		PUSH_TOKEN
+	from 
+		TB_10171020
+    where 
+		user_email = #{userEmail }
+</select>
+	
+	<resultMap id="loginFailMap" type="hashmap"/>
+
+	<insert id="INS10171023" parameterType="hashmap" statementType="CALLABLE">
+
+
+		{ CALL PR_INS10171023( #{userEmail }, 'CMMC00000000016', '0.0.0.1', #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=loginFailMap} ) }
+
+
+	</insert>
+	
+	
+	<insert id="INS10171024" parameterType="hashmap" statementType="CALLABLE">
+
+		{ CALL PR_INS10171024 ( 'CMMC00000000016', #{blckCd }, '0.0.0.1', #{userEmail }, #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=loginFailMap} ) }
+
+
+	</insert>
+
+
+	<select id="getBlckKey" parameterType="String" resultType="String">
+		SELECT T.BLCK_CODE FROM (SELECT * FROM VW_USER_BLCK_INFO WHERE USER_EMAIL = #{value } ORDER BY BLK_DT DESC) T WHERE ROWNUM = 1
+	</select>
+	
+	
+	<insert id="INS10171025" parameterType="hashmap" statementType="CALLABLE">
+
+		{ CALL PR_INS10171025 
+			(
+		        #{userEmail },
+		        #{failCd },
+                #{loginYn },
+		        #{connIp},
+		        #{brwsCd },
+		        #{osCd },
+		        <choose>
+                    <when test = "deviceCd != '' ">
+                        #{deviceCd }
+                    </when>
+                    <otherwise>
+                        ''
+                    </otherwise>
+                </choose>,
+		        #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=loginFailMap}     
+		    ) }
+
+	</insert>
+	
+	<update id="INSUPT10171020" parameterType="hashmap" statementType="CALLABLE">
+
+		{ CALL PR_INSUPT10171020 
+			(
+				#{userEmail }, 
+				#{userPhone }, 
+				#{userPwd }, 
+				#{userNm }, 
+				#{nickNm },
+				#{userMobile },
+				#{postCd }, 
+				#{adrs },
+				#{dtlAdrs },       
+				#{useYn },
+				TO_DATE(#{birthDay }, 'YYYYMMDD'),
+				#{pwdChgYn },
+				#{tmpPwd },
+				#{pushToken },
+				#{signDt },
+				#{regIp },
+				#{gender },
+				#{country },
+				#{langCd },
+				#{lockYn },
+				#{shHaveYn },
+				#{brhCode },
+                #{rcmdCode },
+                #{subUserEmail },
+                #{regEmail },
+                '',
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=loginFailMap} 
+			)
+		}
+
+	</update>
+	
+	<insert id="sendSmsAuthCode" parameterType="hashmap" statementType="CALLABLE">
+
+		{ CALL PR_INS10171026 (#{userEmail }, #{authCode }, #{authType }, #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=loginFailMap} ) }
+
+	</insert>
+
+    <insert id="sendSmsAuthCode2" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+        INSERT INTO TB_101710261
+                (
+                    AUTH_CODE , REG_DT , USER_EMAIL , AUTH_GUBUN
+                )
+        VALUES
+                (
+                    #{authCode} , SYSDATE , #{userEmail} , #{authType}
+                )
+    </insert>
+	
+	<select id="SmsAuthCodeVertify" parameterType="String" resultType="String">
+		SELECT * FROM(
+			SELECT AUTH_CODE AUTHCODE 
+			FROM TB_10171026 
+			WHERE USER_EMAIL = #{value }
+			AND AUTH_GUBUN = 'E'
+			AND ROUND((sysdate-REG_DT)*24*60) <![CDATA[  <=  ]]> 3
+			ORDER BY REG_DT DESC)
+		WHERE ROWNUM = 1
+	</select>
+
+    <select id="getLoginHistory" parameterType="com.bitkrx.api.auth.vo.LoginHistoryVO" resultType="com.bitkrx.api.auth.vo.LoginHistoryResVO">
+
+        SELECT A.*
+          FROM (SELECT ROWNUM AS NO, TX.*
+              FROM (
+                SELECT
+                    USER_EMAIL USEREMAIL,
+                    TO_CHAR(LOGIN_TME, 'YYYY-MM-DD HH24:MI:SS') LOGINTME,
+                    BRWS_CD BRWSCD,
+                    LOGIN_YN LOGINYN,
+                    CONN_IP CONNIP
+                FROM TB_10171025
+                WHERE USER_EMAIL = #{userEmail}
+                <if test="endDate != '' and stdDate != '' ">
+                    AND LOGIN_TME BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+                </if>
+                ORDER BY LOGIN_TME DESC) TX) A
+        WHERE NO BETWEEN #{firstIndex} + 1 AND #{firstIndex} + #{recordCountPerPage}
+    </select>
+
+    <select id="getLoginHistoryCnt" parameterType="com.bitkrx.api.auth.vo.LoginHistoryVO" resultType="int">
+
+        SELECT COUNT(*)
+        FROM (SELECT ROWNUM AS NO, TX.*
+        FROM (
+        SELECT
+        USER_EMAIL USEREMAIL,
+        TO_CHAR(LOGIN_TME, 'YYYY-MM-DD HH24MISS') LOGIN_TME,
+        BRWS_CD,
+        LOGIN_YN,
+        CONN_IP
+        FROM TB_10171025
+        WHERE USER_EMAIL = #{userEmail}
+        <if test="endDate != '' and stdDate != '' ">
+            AND LOGIN_TME BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        ORDER BY LOGIN_TME DESC) TX) A
+    </select>
+
+    <select id="getNatnCode" resultType="com.bitkrx.api.auth.vo.CmeRcmdCode">
+        SELECT
+            NATN_CODE natnCode,
+            NATN_NM natnNm
+        FROM
+            TB_50171003
+        WHERE
+            USE_YN = 'Y'
+        ORDER BY
+            NATN_CODE
+    </select>
+
+    <select id="getBrhCode" parameterType="String" resultType="com.bitkrx.api.auth.vo.CmeRcmdCode">
+        SELECT
+            BRH_CODE brhCode,
+            BRH_NM brhNm
+        FROM
+            TB_50171001
+        WHERE
+            NATN_CODE =  #{value}
+        AND
+            BRH_TYPE = 02
+        AND
+            USE_YN = 'Y'
+        ORDER BY
+            BRH_CODE
+    </select>
+
+    <select id="getRcmdCode" parameterType="String" resultType="com.bitkrx.api.auth.vo.CmeRcmdCode">
+        SELECT
+            RCMD_CODE rcmdCode,
+            TEL_NO   rcmdNm
+        FROM
+            TB_50171002
+         WHERE
+            BRH_CODE = #{value}
+         AND
+            USE_YN = 'Y'
+         ORDER BY
+            RCMD_CODE
+    </select>
+
+    <select id="getUserIp" parameterType="String" resultType="com.bitkrx.api.auth.vo.CheckIpVO">
+        SELECT  T.*
+            FROM
+        ( SELECT
+            CONN_IP CONNIP
+            FROM TB_10171025
+        WHERE USER_EMAIL = #{value}
+        AND BRWS_CD = 'WEB'
+            ORDER BY LOGIN_TME DESC) T
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="SmsAuthCodeCert" parameterType="String" resultType="String">
+        SELECT * FROM(
+			SELECT AUTH_CODE AUTHCODE
+			FROM TB_10171026
+			WHERE USER_EMAIL = #{value }
+			AND AUTH_GUBUN = 'S'
+			AND ROUND((sysdate-REG_DT)*24*60) <![CDATA[  <=  ]]> 10
+			ORDER BY REG_DT DESC)
+		WHERE ROWNUM = 1
+    </select>
+
+    <select id="SmsAuthCodeCert2" parameterType="String" resultType="String">
+        SELECT * FROM(
+			SELECT AUTH_CODE AUTHCODE
+			FROM TB_101710261
+			WHERE USER_EMAIL = #{value }
+			AND AUTH_GUBUN = 'U'
+			AND ROUND((sysdate-REG_DT)*24*60) <![CDATA[  <=  ]]> 10
+			ORDER BY REG_DT DESC)
+		WHERE ROWNUM = 1
+    </select>
+
+    <select id="getRecentIp" parameterType="String" resultType="String">
+         SELECT ROWNUM AS RN, T.* FROM(
+        SELECT
+            T1.USER_EMAIL USEREMAIL,
+            T1.IP,
+            T1.LIMT_HR LIMTHR,
+            T2.LOGIN_TME LOGINTM,
+            TO_CHAR(T1.REG_DT, 'YYYY-MM-DD HH24:MI:SS') STDDT,
+            TO_CHAR(T1.REG_DT + LIMT_HR/24, 'YYYY-MM-DD HH24:MI:SS') ENDDT
+        FROM TB_10171088 T1, (SELECT CONN_IP, MAX(LOGIN_TME) LOGIN_TME FROM TB_10171025 GROUP BY CONN_IP) T2
+        WHERE
+        T1.USER_EMAIL = #{value}
+        AND T1.IP = T2.CONN_IP(+)
+        order by logintm desc
+        )T
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getHTSUserIp" parameterType="String" resultType="String">
+        SELECT  T.*
+            FROM
+        ( SELECT
+            CONN_IP CONNIP
+            FROM TB_10171025
+        WHERE USER_EMAIL = #{value}
+        AND BRWS_CD = 'HTS'
+            ORDER BY LOGIN_TME DESC) T
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="mtsDeviceCode" parameterType="String" resultType="String">
+        SELECT  T.*
+            FROM
+        ( SELECT
+            DIVICE_CD DIVICECD
+            FROM TB_10171025
+        WHERE USER_EMAIL = #{value}
+        AND BRWS_CD = 'MTS'
+            ORDER BY LOGIN_TME DESC) T
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="pinNoCheck" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO" resultType="int">
+        SELECT
+                count(pin_no)
+        FROM
+                TB_101710204
+        WHERE
+                USER_EMAIL = #{userEmail}
+        <if test="deviceCd != '' ">
+        AND
+                DVCID = #{deviceCd}
+        </if>
+    </select>
+
+    <update id="InsertPinNo" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+        MERGE INTO TB_101710204
+          USING DUAL
+          ON (DVCID = #{deviceCd} AND USER_EMAIL = #{userEmail})
+        WHEN MATCHED THEN
+          UPDATE
+          SET
+              PIN_NO     = #{pinNo},
+              UPT_DT     = SYSDATE,
+              UPT_EMAIL  = #{userEmail}
+        WHEN NOT MATCHED THEN
+        INSERT  (
+                     USER_EMAIL
+                    ,DVCID
+                    ,PIN_NO
+                    ,UPT_EMAIL
+                    ,UPT_DT
+                    ,DVCNM
+                 )
+                  VALUES(
+                     #{userEmail}
+                    ,#{deviceCd}
+                    ,#{pinNo}
+                    ,#{userEmail}
+                    ,SYSDATE
+                    ,#{deviceNm}
+                  )
+    </update>
+
+    <update id="pinNoReset" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+        UPDATE
+        TB_101710204  SET  PIN_NO = #{pinNo}
+        WHERE
+        USER_EMAIL = #{userEmail}
+        <if test="deviceCd != '' ">
+            AND DVCID = #{deviceCd}
+        </if>
+    </update>
+
+    <select id="pinLoginCheck" parameterType="com.bitkrx.api.auth.vo.LoginResVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_101710204
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            PIN_NO = #{pinNo}
+        AND
+            DVCID = #{deviceCd}
+    </select>
+
+    <select id="fingerLoginCheck" parameterType="com.bitkrx.api.auth.vo.LoginResVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_101710204
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            DVCID = #{deviceCd}
+        AND
+            FNGR_YN = 'Y'
+    </select>
+
+    <select id="pinUserCheck" parameterType="com.bitkrx.api.auth.vo.LoginResVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_101710204
+        WHERE
+           USER_EMAIL = #{userEmail}
+        <if test="deviceCd != '' ">
+            AND
+            DVCID = #{deviceCd}
+        </if>
+    </select>
+
+    <select id="deviceCheck" parameterType="com.bitkrx.api.auth.vo.LoginResVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_101710204
+        WHERE
+            DVCID = #{deviceCd}
+    </select>
+
+    <select id="deviceSubCheck" parameterType="com.bitkrx.api.auth.vo.LoginResVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_101710204
+        WHERE
+            DVCID = #{deviceCd}
+        AND
+            USER_EMAIL = #{userEmail}
+    </select>
+
+    <update id="uptPinInfo" parameterType="com.bitkrx.api.auth.vo.LoginResVO">
+        UPDATE
+            TB_101710204
+        SET
+            USER_EMAIL = #{userEmail},
+            PIN_NO = #{pinNo},
+            UPT_EMAIL = #{userEmail},
+            UPT_DT = SYSDATE,
+            DVCNM = #{deviceNm}
+        WHERE
+            DVCID = #{deviceCd}
+    </update>
+
+    <select id="getPwdCheck" parameterType="loginVO" resultType="int">
+        SELECT
+            COUNT(TB1.USER_EMAIL)
+        FROM
+            TB_10171020 TB1
+        WHERE
+            TB1.user_email = #{userEmail }
+        AND
+            TB1.user_pwd = #{userPwd}
+  </select>
+
+    <select id="getUserAuthInfo" parameterType="String" resultType="loginResVO">
+        SELECT T.* FROM (
+            SELECT
+                   TB1.USER_EMAIL USEREMAIL,
+                   TB1.USER_NM USERNM,
+                   TB1.USER_MOBILE USERMOBILE,
+                   TB1.PWD_CHG_YN PWDCHGYN,
+                   NVL(TB2.EMAIL_CERT_YN, 'N') EMAILCERTYN,
+                   TB3.BLCK_YN BLCKYN,
+                   TB3.REL_YN RELYN,
+                   NVL(TB2.OTP_SERIAL,'') OTPNO,
+                   NVL(TB4.BANK_ACC_NO,'') ACCOUNTNO,
+                   NVL(TB2.SMS_CERT_YN,'N') SMSCERTYN,
+                   TB1.USE_YN USEYN,
+                   NVL(TB1.LOCK_YN, 'N') LOCKYN,
+                   NVL(LANG_CD, 'en') LANGCD,
+                   NVL(TB2.USER_INFO_YN , '') USERINFOYN
+              FROM
+                  TB_10171020 TB1, TB_10171021 TB2, VW_USER_BLCK_INFO TB3, TB_10171022 TB4
+             WHERE
+                 TB1.USER_EMAIL = TB2.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB3.USER_EMAIL(+)
+             AND
+                TB1.USER_EMAIL = TB4.USER_EMAIL(+)
+             AND
+		        TB1.USER_EMAIL = #{value}
+            ORDER BY TB3.BLK_DT DESC ) T
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getFingetCheck" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO" resultType="int">
+        SELECT
+          COUNT(*)
+        FROM
+          TB_101710204
+        WHERE
+          USER_EMAIL = #{userEmail}
+        AND
+          DVCID = #{deviceCd}
+        AND
+          FNGR_YN = 'Y'
+    </select>
+
+    <update id="InsFingerInfo" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+         MERGE INTO TB_101710204
+          USING DUAL
+          ON (DVCID = #{deviceCd}
+              AND USER_EMAIL = #{userEmail})
+        WHEN MATCHED THEN
+          UPDATE
+          SET
+              UPT_DT     = SYSDATE,
+              UPT_EMAIL  = #{userEmail},
+              FNGR_YN = 'Y'
+        WHEN NOT MATCHED THEN
+        INSERT  (
+                     USER_EMAIL
+                    ,DVCID
+                    ,DVCNM
+                    ,FNGR_YN
+                 )
+                  VALUES(
+                     #{userEmail}
+                    ,#{deviceCd}
+                    ,#{deviceNm}
+                    ,'Y'
+                  )
+    </update>
+
+    <select id="getFingerCheckDv" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO" resultType="int">
+      SELECT
+          COUNT(*)
+      FROM
+          TB_101710204
+      WHERE DVCID = #{deviceCd}
+      AND FNGR_YN = 'Y'
+    </select>
+
+    <select id="getFingerCheckEmail" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO" resultType="int">
+      SELECT
+        COUNT(*)
+      FROM
+        TB_101710204
+      WHERE
+          USER_EMAIL = #{userEmail}
+      AND
+          DVCID = #{deviceCd}
+      AND
+          FNGR_YN = 'Y'
+    </select>
+
+    <update id="fingerReset" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+        UPDATE
+              TB_101710204  SET  FNGR_YN = #{fingerStatus}
+        WHERE
+              DVCID = #{deviceCd}
+         AND
+              USER_EMAIL != #{userEmail}
+
+    </update>
+
+    <update id="uptFingerInfo" parameterType="com.bitkrx.api.auth.vo.CmeLoginVO">
+        UPDATE
+              TB_101710204 SET FNGR_YN = 'N'
+        WHERE USER_EMAIL = #{userEmail} OR DVCID = #{deviceCd}
+    </update>
+</mapper>

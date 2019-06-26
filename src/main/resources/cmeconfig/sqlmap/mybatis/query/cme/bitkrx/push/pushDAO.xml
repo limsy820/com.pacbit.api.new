@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pushDAO">
+	
+	<resultMap id="pushMap" type="hashmap"/>
+	
+	<update id="PR_INSUPT10171061" parameterType="hashmap" statementType="CALLABLE">
+		
+		{ CALL PR_INSUPT10171061 
+			(
+		        #{cntnsCode},
+			    #{userEmail},
+			    #{regEmail },
+			    #{regIp    },
+			    #{rsvDt    },
+			    #{pushCode },
+			    #{cntntTitle},
+			    #{cntnsMsg },
+			    #{pushKndCd},
+			    #{pushSendYn},
+			    TO_DATE(#{pushSendDt}, 'YYYYMMDD'),
+			    #{pushCompCode},
+			    #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=pushMap}     
+		    ) 
+		}
+		    
+	</update>
+
+	<select id="getPushKey" parameterType="String" resultType="String">
+		SELECT FCM_CODE FROM TB_10171060 WHERE BIZ_CODE = #{value} AND FCM_CODE <![CDATA[  <> ]]> 'HTS' AND ROWNUM = 1
+	</select>
+	
+	
+	<select id="pushNotCompList" parameterType="String" fetchSize="500" resultType="com.bitkrx.api.push.vo.HtsPushResVO">
+	    SELECT 
+	    	PUSH_KND_CD PUSHTYPE,
+	    	CNTNS_MSG PUSHMSG 
+	    FROM TB_10171061 
+	    WHERE PUSH_CODE = 'PUSH000000000000002' 
+	    AND PUSH_SEND_YN = 'N' 
+	    AND USER_EMAIL = #{value} 
+	    AND ROUND((sysdate-REG_DT)*24*60*60) <![CDATA[  <=  ]]> 10
+        UNION
+        SELECT * FROM(
+            SELECT
+                PUSH_KND_CD PUSHTYPE,
+                CNTNS_MSG PUSHMSG
+            FROM TB_10171061
+            WHERE PUSH_KND_CD = 'CMMC00000000285'
+            ORDER BY REG_DT DESC)
+        WHERE ROWNUM = 1
+        UNION
+        SELECT
+            PUSH_KND_CD PUSHTYPE,
+            CNTNS_MSG PUSHMSG
+        FROM TB_10171061
+        WHERE PUSH_KND_CD = 'CMMC00000000665'
+        AND ROUND((sysdate-REG_DT)*24*60*60) <![CDATA[  <=  ]]> 10
+	    
+	 </select>
+	 
+	 <select id="pushNotice" parameterType="String" resultType="String">
+		 SELECT * FROM(
+			    SELECT 
+			        CNTNS_MSG PUSHMSG 
+			    FROM TB_10171061 
+			    WHERE PUSH_KND_CD = 'CMMC00000000285'
+			    ORDER BY REG_DT DESC)
+			WHERE ROWNUM = 1
+	 </select>
+	
+	 
+	 <update id="uptHtsPush" parameterType="String" >
+	    UPDATE 
+	    	TB_10171061 
+	    SET 
+	    	PUSH_SEND_YN = 'Y', PUSH_COMP_CODE = 'Y' 
+	    WHERE 
+	    	ROUND((sysdate-REG_DT)*24*60*60) <![CDATA[  <=  ]]> 5
+	    AND 
+	    	USER_EMAIL = #{value}
+	 </update>
+	 
+	 <select id="getPushList" parameterType="com.bitkrx.api.push.vo.CmeFcmPushVO" resultType="com.bitkrx.api.push.vo.PushListVO">
+
+         SELECT A.*
+             FROM (SELECT ROWNUM AS NO, TX.*
+                 FROM (
+                      SELECT
+                          PUSH_KND_CD PUSHTYPE,
+                          REG_DT REGDT,
+                          CNTNS_MSG CNTNSMSG,
+                          CNTNS_CODE CNTNSCODE,
+                          IS_READ ISREAD
+                      FROM TB_10171061
+                      WHERE
+                          USER_EMAIL = #{userEmail}
+                          AND PUSH_CODE = #{pushCode}
+             ORDER BY REG_DT DESC , CNTNS_CODE DESC) TX) A
+         WHERE NO BETWEEN #{firstIndex} + 1 AND #{firstIndex} + #{recordCountPerPage}
+	</select>
+	
+	
+	<update id="PR_INSUPT_SND_MSG" parameterType="com.bitkrx.api.push.vo.SendMsgVO">
+		{ call PR_INSUPT_SND_MSG
+			(
+				#{seq			,mode=IN,jdbcType=VARCHAR},
+				#{cmmCd			,mode=IN,jdbcType=VARCHAR},
+				#{userEmail		,mode=IN,jdbcType=VARCHAR},
+				#{msg			,mode=IN,jdbcType=VARCHAR},
+				#{sendYn		,mode=IN,jdbcType=VARCHAR}
+			)
+		}
+	</update>
+	
+	<select id="selectPushYn" parameterType="com.bitkrx.api.push.vo.PushYnVO" resultType="com.bitkrx.api.push.vo.PushYnVO">
+		
+		SELECT * FROM(
+		    SELECT
+		        '1' NUM,
+		        NVL(ALRM_BS_YN, 'Y') ALRMBSYN,
+		        NVL(BS_BS01, 'Y') BSBS01,
+		        NVL(BS_BS02, 'Y') BSBS02,
+		        NVL(BS_BS03, 'Y') BSBS03,
+		        NVL(BS_BS04, 'Y') BSBS04,
+		        NVL(BS_SB01, 'Y') BSSB01,
+		        NVL(BS_SB02, 'Y') BSSB02,
+		        NVL(BS_SB03, 'Y') BSSB03,
+		        NVL(BS_SB04, 'Y') BSSB04,
+		        NVL(BS_IO01, 'Y') BSIO01,
+		        NVL(BS_IO02, 'Y') BSIO02,
+		        NVL(BS_IO03, 'Y') BSIO03,
+		        NVL(BS_IO04, 'Y') BSIO04,
+		        NVL(ALRM_TM_YN, 'N') ALRMTMYN,
+		        NVL(TM_COIN01, 'N') TMCOIN01,
+		        NVL(TM_COIN02, 'N') TMCOIN02,
+		        NVL(TM_COIN03, 'N') TMCOIN03,
+		        NVL(TM_COIN04, 'N') TMCOIN04,
+		        NVL(TM_COIN05, 'N') TMCOIN05,
+		        NVL(TM_COIN06, 'N') TMCOIN06,
+		        NVL(TM_COIN07, 'N') TMCOIN07,
+		        NVL(TM_COIN08, 'N') TMCOIN08,
+		        NVL(TM_COIN09, 'N') TMCOIN09,
+		        NVL(TM_COIN10, 'N') TMCOIN10,
+		        NVL(TM_COIN11, 'N') TMCOIN11,
+		        NVL(TM_COIN12, 'N') TMCOIN12,
+		        NVL(TM_COIN13, 'N') TMCOIN13,
+		        NVL(TM_COIN14, 'N') TMCOIN14,
+		        NVL(TM_COIN15, 'N') TMCOIN15,
+		        NVL(TM_COIN16, 'N') TMCOIN16,
+		        NVL(TM_COIN17, 'N') TMCOIN17,
+		        NVL(TM_COIN18, 'N') TMCOIN18,
+		        NVL(TM_COIN19, 'N') TMCOIN19,
+		        NVL(TM_COIN20, 'N') TMCOIN20,
+		        NVL(TM_COIN21, 'N') TMCOIN21,
+		        NVL(TM_COIN22, 'N') TMCOIN22,
+		        NVL(TM_COIN23, 'N') TMCOIN23,
+		        NVL(TM_COIN24, 'N') TMCOIN24,
+		        NVL(STT_HH, '0') STTHH,
+		        NVL(END_HH, '0') ENDHH,
+		        NVL(TERM_HH, '0') TERMHH
+		    FROM     
+		        TB_10171076
+		    WHERE USER_EMAIL = #{userEmail}
+		    UNION
+		    SELECT
+		        '2' NUM,
+		        'Y' ALRMBSYN,
+		        'Y' BSBS01,
+		        'Y' BSBS02,
+		        'Y' BSBS03,
+		        'Y' BSBS04,
+		        'Y' BSSB01,
+		        'Y' BSSB02,
+		        'Y' BSSB03,
+		        'Y' BSSB04,
+		        'Y' BSIO01,
+		        'Y' BSIO02,
+		        'Y' BSIO03,
+		        'Y' BSIO04,
+		        'N' ALRMTMYN,
+		        'N' TMCOIN01,
+		        'N' TMCOIN02,
+		        'N' TMCOIN03,
+		        'N' TMCOIN04,
+		        'N' TMCOIN05,
+		        'N' TMCOIN06,
+		        'N' TMCOIN07,
+		        'N' TMCOIN08,
+		        'N' TMCOIN09,
+		        'N' TMCOIN10,
+		        'N' TMCOIN11,
+		        'N' TMCOIN12,
+		        'N' TMCOIN13,
+		        'N' TMCOIN14,
+		        'N' TMCOIN15,
+		        'N' TMCOIN16,
+		        'N' TMCOIN17,
+		        'N' TMCOIN18,
+		        'N' TMCOIN19,
+		        'N' TMCOIN20,
+		        'N' TMCOIN21,
+		        'N' TMCOIN22,
+		        'N' TMCOIN23,
+		        'N' TMCOIN24,
+		        0 STTHH,
+		        0 ENDHH,
+		        0 TERMHH
+		    FROM DUAL
+		    ORDER BY NUM)
+		WHERE ROWNUM = 1
+	</select>
+	    
+	<update id="insUptPushYn" parameterType="com.bitkrx.api.push.vo.PushYnVO">
+		MERGE INTO TB_10171076
+		    USING DUAL    
+		ON
+		    (USER_EMAIL = #{userEmail})
+		WHEN MATCHED THEN
+		            UPDATE 
+		            SET    
+		            	ALRM_BS_YN = NVL(#{alrmBsYn},ALRM_BS_YN),
+		                BS_BS01 = NVL(#{bsBs01},BS_BS01), 
+		                BS_BS02 = NVL(#{bsBs02},BS_BS02),
+		                BS_BS03 = NVL(#{bsBs03},BS_BS03),
+		                BS_BS04 = NVL(#{bsBs04},BS_BS04),
+		                BS_SB01 = NVL(#{bsSb01},BS_SB01),
+		                BS_SB02 = NVL(#{bsSb02},BS_SB02),
+		                BS_SB03 = NVL(#{bsSb03},BS_SB03),
+		                BS_SB04 = NVL(#{bsSb04},BS_SB04),
+		                BS_IO01 = NVL(#{bsIo01},BS_IO01),
+		                BS_IO02 = NVL(#{bsIo02},BS_IO02),
+		                BS_IO03 = NVL(#{bsIo03},BS_IO03),
+		                BS_IO04 = NVL(#{bsIo04},BS_IO04),
+		                ALRM_TM_YN = NVL(#{alrmTmYn},ALRM_TM_YN),
+		                TM_COIN01 = NVL(#{tmCoin01},TM_COIN01),
+		                TM_COIN02 = NVL(#{tmCoin02},TM_COIN02),
+		                TM_COIN03 = NVL(#{tmCoin03},TM_COIN03),
+		                TM_COIN04 = NVL(#{tmCoin04},TM_COIN04),
+		                TM_COIN05 = NVL(#{tmCoin05},TM_COIN05),
+		                TM_COIN06 = NVL(#{tmCoin06},TM_COIN06),
+		                TM_COIN07 = NVL(#{tmCoin07},TM_COIN07),
+		                TM_COIN08 = NVL(#{tmCoin08},TM_COIN08),
+		                TM_COIN09 = NVL(#{tmCoin09},TM_COIN09),
+		                TM_COIN10 = NVL(#{tmCoin10},TM_COIN10),
+		                TM_COIN11 = NVL(#{tmCoin11},TM_COIN11),
+		                TM_COIN12 = NVL(#{tmCoin12},TM_COIN12),
+		                TM_COIN13 = NVL(#{tmCoin13},TM_COIN13),
+		                TM_COIN14 = NVL(#{tmCoin14},TM_COIN14),
+		                TM_COIN15 = NVL(#{tmCoin15},TM_COIN15),
+		                TM_COIN16 = NVL(#{tmCoin16},TM_COIN16),
+		                TM_COIN17 = NVL(#{tmCoin17},TM_COIN17),
+		                TM_COIN18 = NVL(#{tmCoin18},TM_COIN18),
+		                TM_COIN19 = NVL(#{tmCoin19},TM_COIN19),
+		                TM_COIN20 = NVL(#{tmCoin20},TM_COIN20),
+		                TM_COIN21 = NVL(#{tmCoin21},TM_COIN21),
+		                TM_COIN22 = NVL(#{tmCoin22},TM_COIN22),
+		                TM_COIN23 = NVL(#{tmCoin23},TM_COIN23),
+		                TM_COIN24 = NVL(#{tmCoin24},TM_COIN24),
+		                STT_HH = NVL(#{sttHh},STT_HH),
+		                END_HH = NVL(#{endHh},END_HH),
+		                TERM_HH = NVL(#{termHh},TERM_HH),
+		                UPT_IP = #{regIp},
+		                UPT_EMAIL = #{userEmail},
+		                UPT_DT = SYSDATE
+		        WHEN NOT MATCHED THEN
+		            INSERT  (   USER_EMAIL, ALRM_BS_YN, 
+		                    BS_BS01, BS_BS02, BS_BS03, BS_BS04,
+		                    BS_SB01, BS_SB02, BS_SB03, BS_SB04, 
+		                    BS_IO01, BS_IO02, BS_IO03, BS_IO04, 
+		                    ALRM_TM_YN,
+		                    TM_COIN01, TM_COIN02, TM_COIN03, TM_COIN04, TM_COIN05, TM_COIN06, TM_COIN07, TM_COIN08, TM_COIN09, TM_COIN10, TM_COIN11, TM_COIN12, TM_COIN13, TM_COIN14, TM_COIN15, TM_COIN16,
+		                    TM_COIN17, TM_COIN18, TM_COIN19, TM_COIN20, TM_COIN21, TM_COIN22, TM_COIN23, TM_COIN24,
+		                    STT_HH, END_HH, TERM_HH,
+		                    REG_IP, REG_EMAIL, REG_DT,
+		                    UPT_IP, UPT_EMAIL, UPT_DT  )
+		            VALUES
+		                (   #{userEmail}, #{alrmBsYn}, 
+		                    #{bsBs01}, #{bsBs02}, #{bsBs03}, #{bsBs04},
+		                    #{bsSb01}, #{bsSb02}, #{bsSb03}, #{bsSb04}, 
+		                    #{bsIo01}, #{bsIo02}, #{bsIo03}, #{bsIo04}, 
+		                    #{alrmTmYn},
+		                    #{tmCoin01}, #{tmCoin02}, #{tmCoin03}, #{tmCoin04}, #{tmCoin05} , #{tmCoin06}, #{tmCoin07} ,#{tmCoin08} ,#{tmCoin09}, #{tmCoin10}, #{tmCoin11}, #{tmCoin12}, #{tmCoin13}, #{tmCoin14},
+		                    #{tmCoin15}, #{tmCoin16}, #{tmCoin17}, #{tmCoin18}, #{tmCoin19} , #{tmCoin20}, #{tmCoin21} ,#{tmCoin22} ,#{tmCoin23}, #{tmCoin24},
+		                    NVL(#{sttHh},0), #{endHh}, #{termHh},
+		                    #{regIp}, #{userEmail}, SYSDATE,
+		                    #{regIp}, #{userEmail}, SYSDATE  )
+	</update>
+</mapper>
+
+
+

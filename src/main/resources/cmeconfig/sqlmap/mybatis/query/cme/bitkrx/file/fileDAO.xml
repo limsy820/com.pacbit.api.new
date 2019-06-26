@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="fileDAO">
+
+    <select id="getFileKey" resultType="String">
+
+        SELECT FN_GEN_KEY('TB_50171012', 'FILE_ID', '') FROM DUAL
+    </select>
+
+    <insert id="insUptFileInfo" parameterType="map">
+
+        MERGE INTO TB_50171012
+        USING DUAL
+        ON (USER_EMAIL = #{userEmail})
+        WHEN MATCHED THEN
+            UPDATE
+            SET
+                FILE_NAME1     =   NVL(#{fileName1}, FILE_NAME1),
+                FILE_NAME2     =   NVL(#{fileName2}, FILE_NAME2),
+                UPT_DT         =   SYSDATE
+        WHEN NOT MATCHED THEN
+            INSERT (USER_EMAIL, FILE_ID, FILE_NAME1, FILE_NAME2, REG_EMAIL, REG_DT)
+            VALUES (#{userEmail}, #{fileId}, #{fileName1}, #{fileName2}, #{userEmail}, SYSDATE)
+
+
+
+    </insert>
+
+    <select id="selectFileKey" parameterType="String" resultType="String">
+
+        SELECT MAX(FILE_ID) FROM TB_50171012 WHERE USER_EMAIL = #{value}
+    </select>
+
+
+    <select id="getCertFileKey" resultType="String">
+        SELECT FN_GEN_KEY('TB_50171033', 'CERT_CODE', '') FROM DUAL
+    </select>
+
+    <insert id="insUptCertFileInfo" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO">
+        MERGE INTO TB_50171033
+        USING DUAL
+        ON (USER_EMAIL = #{userEmail}
+            AND CERT_CODE = #{certCode})
+        WHEN MATCHED THEN
+            UPDATE
+            SET
+		USER_MOBILE    =   #{userMobile},
+                FILE_NAME1     =   NVL(#{fileName1}, FILE_NAME1),
+                FILE_NAME2     =   NVL(#{fileName2}, FILE_NAME2),
+		FILE_NAME3     =   NVL(#{fileName3}, FILE_NAME3),
+		CERT_YN        =   #{certYn},
+		CERT_MSG       =   #{certMsg},
+		CERT_GRADE     =   #{certGrade},
+		CERT_SUB_GRADE =   #{certSubGrade},
+                UPT_DT         =   SYSDATE,
+                UPT_EMAIL      =   #{userEmail}
+        WHEN NOT MATCHED THEN
+            INSERT (USER_EMAIL, CERT_CODE, USER_MOBILE, FILE_NAME1, FILE_NAME2, FILE_NAME3, CERT_MSG, CERT_YN, CERT_GRADE, CERT_SUB_GRADE, REG_DT, REG_EMAIL)
+            VALUES (#{userEmail}, #{certCode}, #{userMobile}, #{fileName1}, #{fileName2},#{fileName3},#{certMsg}, #{certYn}, #{certGrade},#{certSubGrade}, SYSDATE, #{userEmail})
+    </insert>
+
+    <select id="selectCertFileKey" parameterType="String" resultType="String">
+        SELECT MAX(CERT_CODE) FROM TB_50171033 WHERE USER_EMAIL = #{value}
+    </select>
+
+
+    <select id="selectCertList" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="com.bitkrx.api.auth.vo.SubmitCertVO">
+        SELECT
+            USER_EMAIL userEmail,
+            USER_MOBILE userMobile,
+            REG_DT regDt,
+            CERT_GRADE certGrade,
+            CERT_SUB_GRADE certSubGrade,
+            CERT_YN certYn,
+            CERT_FAIL_MSG certFailMsg,
+            UPT_DT uptDt
+        FROM
+            TB_50171033
+        WHERE
+            USER_EMAIL = #{userEmail}
+        ORDER BY
+            REG_DT
+        DESC
+    </select>
+
+    <select id="getCertList" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="java.lang.Integer">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_50171033
+        WHERE
+            USER_EMAIL = #{userEmail}
+        ORDER BY
+            REG_DT DESC
+    </select>
+
+    <select id="getCertInfo" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="com.bitkrx.api.auth.vo.SubmitCertVO">
+        SELECT
+             USER_EMAIL userEmail,
+             CERT_CODE  certCode
+        FROM
+            TB_50171033
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            CERT_GRADE = #{certGrade}
+        AND
+            CERT_SUB_GRADE = #{certSubGrade}
+    </select>
+
+    <insert id="insCertInfo" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO">
+        INSERT INTO TB_50171033(
+         CERT_CODE, CERT_GRADE , CERT_SUB_GRADE , USER_EMAIL , USER_MOBILE , CERT_MSG , CERT_YN, REG_DT, REG_EMAIL
+        )
+        VALUES (
+         #{certCode}, #{certGrade} , #{certSubGrade} , #{userEmail} , #{userMobile} , #{certMsg}, #{certYn}, SYSDATE, #{userEmail}
+        )
+    </insert>
+
+    <update id="uptCertInfo" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO">
+        UPDATE
+            TB_50171033
+        SET
+            FILE_NAME1     =   NVL(#{fileName1}, FILE_NAME1),
+            FILE_NAME2     =   NVL(#{fileName2}, FILE_NAME2),
+		    FILE_NAME3     =   NVL(#{fileName3}, FILE_NAME3)
+        WHERE
+            CERT_CODE      =   #{certCode}
+    </update>
+
+    <select id="getEmailCnt" parameterType="String" resultType="int">
+        SELECT
+            COUNT(TB1.USER_EMAIL)
+        FROM
+            TB_10171020 TB1
+        WHERE
+            TB1.user_email = #{value}
+    </select>
+
+    <select id="getRegDt" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="String">
+        SELECT
+            TO_CHAR(REG_DT,'YYYY-MM-DD HH24:MI:SS') AS regDt
+        FROM
+            TB_50171033
+        WHERE
+            USER_EMAIL = #{userEmail}
+        AND
+            CERT_CODE = #{certCode}
+    </select>
+
+</mapper>

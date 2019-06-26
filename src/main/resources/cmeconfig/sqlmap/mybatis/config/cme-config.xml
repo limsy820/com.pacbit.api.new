@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+    PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+
+    <settings>
+        <!-- changes from the defaults for testing -->
+        <setting name="cacheEnabled" value="false" />
+        <!-- 오라클은 false 다!!!!! -->
+        <setting name="useGeneratedKeys" value="false" />
+        <setting name="defaultExecutorType" value="REUSE" />
+    </settings>
+
+	<typeAliases>
+		<typeAlias  alias="loginVO"   type="com.bitkrx.api.auth.vo.CmeLoginVO"/>
+		<typeAlias  alias="loginResVO"   type="com.bitkrx.api.auth.vo.LoginResVO"/>
+		
+		
+		<typeAlias  alias="coinChartVO"  type="com.bitkrx.api.chart.vo.CoinChartVO"/>
+
+        <!-- 게시판 -->
+        <typeAlias alias="BoardVO"      type="com.bitkrx.api.board.vo.BoardVO"/>
+	</typeAliases>
+    
+</configuration>

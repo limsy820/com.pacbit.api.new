@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="moaCardDAO">
+
+    <resultMap id="moaCardMap" type="hashmap" />
+
+    <insert id="insCardReqInfo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        INSERT INTO TB_50171031
+        (USER_EMAIL, SEQ, STATUS, --상태(01:접수, 02:발송, 03:인증, 04:해지)
+         POST_CD, ADRS, DTL_ADRS,
+         SEND_MTH_CD, --발송수단(01:매장방문, 02:우편발송)
+         REG_DT, REG_EMAIL, BRH_CODE, REQ_TYPE, CARD_ACT_CODE,
+         ORDERID, IN_MTH_CD, USER_MOBILE, AMOUNT)
+        VALUES
+        (#{userEmail},
+         (SELECT COUNT(USER_EMAIL) + 1 FROM TB_50171031 WHERE USER_EMAIL = #{userEmail}),
+         '01', --상태
+         #{postCd},
+         #{adrs},
+         #{dtlAdrs},
+         #{sendMthCd}, --발송수단(01:매장방문, 02:우편발송)
+         SYSDATE,
+         #{userEmail},
+         '000000000000041',
+         #{reqType},
+         #{cardActCode},
+         #{orderId},
+         #{inMthCd},
+         #{userMobile},
+         #{amount}
+        )
+
+    </insert>
+
+    <select id="userReqCardCnt" parameterType="String" resultType="int">
+
+        SELECT COUNT(USER_EMAIL) FROM TB_50171031 WHERE USER_EMAIL = #{value} AND STATUS IN ('01', '02', '03', '04', '05')
+    </select>
+
+    <select id="selectUserReqList" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqListVO" resultType="com.bitkrx.api.moaCard.vo.MoaCardReqListVO">
+
+        SELECT
+            USER_EMAIL USEREMAIL,
+            STATUS STATUS,
+            CARD_NO CARDNUM,
+            REQ_DT REQDT,
+            SEND_DT SENDDT,
+            CRET_DT CRETDT,
+            REG_DT REGDT,
+            SEND_MTH_CD SENDMTHCD,
+            BRH_CODE BRHCODE,
+            CLOSE_YN CLOSEYN,
+            POST_CD POSTCD,
+            ADRS,
+            DTL_ADRS DTLADRS,
+            IN_MTH_CD INMTHCD,
+            IN_DT INDT,
+            REQ_TYPE REQTYPE,
+            SUM_UP SUMUP,
+            ORDERID,
+            TID
+        FROM TB_50171031
+        WHERE 1 = 1
+        <if test="status != '' ">
+        AND STATUS = #{status}
+        </if>
+        <if test="userEmail != '' ">
+        AND USER_EMAIL = #{userEmail}
+        </if>
+        <if test="brhCode != '' ">
+        AND BRH_CODE = #{brhCode}
+        </if>
+        <if test="cardNum != '' ">
+            AND CARD_NO = #{cardNum} AND ROWNUM = 1
+        </if>
+        AND STATUS NOT IN ('07')
+        ORDER BY REG_DT DESC , ORDERID DESC
+    </select>
+
+    <update id="uptCardRegComp" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        UPDATE TB_50171031 SET
+            CARD_NO = #{cardNum},
+            BRH_CODE = NVL(#{brhCode}, BRH_CODE),
+            STATUS = '04',
+            CRET_DT = SYSDATE,
+            BANK_CD = #{bankCd},
+            BANK_ACC_NUM = #{bankAccNum},
+            CERT_USER_NM = #{userNm}
+        WHERE USER_EMAIL = #{userEmail} AND STATUS = '03' AND ROWNUM = 1
+
+    </update>
+
+    <update id="uptCardRegBack" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        UPDATE TB_50171031 SET
+            BRH_CODE = '',
+            STATUS = #{status},
+            CRET_DT = '',
+            BANK_CD = '',
+            BANK_ACC_NUM = ''
+        WHERE USER_EMAIL = #{userEmail}
+        AND STATUS = '04'
+        AND CARD_NO = #{cardNum}
+
+    </update>
+
+    <select id="cardReqpayInfo" resultType="com.bitkrx.api.moaCard.vo.CardReqPayInfoVO">
+        SELECT
+            CARD_ACT_CODE CARDACTCODE,
+            ACT_NO ACTNO,
+            BANK_NM BANKNM,
+            CARD_REQ_PRC CARDREQPRC,
+            DLVR DLVR
+        FROM
+            TB_50171032
+        WHERE
+            1 = 1
+    </select>
+
+    <select id="getOrderIdKey" resultType="String">
+
+        SELECT FN_GEN_KEY('TB_50171034', 'ORDERID', '') FROM DUAL
+    </select>
+
+    <select id="getStatusValue" parameterType="String" resultType="String">
+        SELECT
+          STATUS STATUS
+        FROM
+          TB_50171031
+        WHERE
+          ORDERID = #{value}
+    </select>
+
+    <select id="getUserNation" parameterType="String" resultType="String">
+       SELECT
+          COUNTRY_CD COUNTRYCD
+       FROM
+          TB_10171020
+       WHERE
+          USER_EMAIL = #{value}
+    </select>
+
+    <update id="uptCardSendInfo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        UPDATE TB_50171030
+        SET
+            ORDERID = #{orderId},
+            USER_EMAIL = #{userEmail},
+            UPT_DT = SYSDATE,
+            UPT_EMAIL = #{userEmail},
+            EMAIL_SND_DT = SYSDATE
+        WHERE ORDERID IS NULL
+        AND USER_EMAIL IS NULL
+        AND ROWNUM = 1
+
+    </update>
+
+    <select id="getCardSendInfoCnt" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="int">
+        SELECT COUNT(1) FROM TB_50171030 WHERE USER_EMAIL = #{userEmail} AND ORDERID = #{orderId}
+    </select>
+
+    <update id="uptCardSendDt" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+        UPDATE TB_50171030
+        SET
+            UPT_DT = SYSDATE,
+            EMAIL_SND_DT = SYSDATE
+        WHERE
+            ORDERID = #{orderId}
+        AND USER_EMAIL = #{userEmail}
+    </update>
+
+    <select id="selectCardBankInfo" parameterType="String" resultType="com.bitkrx.api.moaCard.vo.CardBankInfoVO">
+        SELECT VACC, BANK_CD BANKCD FROM TB_50171030 WHERE REPLACE(CARD_NO, '-', '') = #{cardNum}
+    </select>
+
+    <select id="selectUserRegInfo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="int">
+
+        SELECT COUNT(*) FROM (
+            SELECT
+                (SELECT USER_NM FROM TB_10171020 WHERE USER_EMAIL = T.USER_EMAIL) USER_NM
+            FROM TB_50171031 T
+            WHERE USER_MOBILE = #{userMobile}
+                  AND STATUS IN ('01','02','03','04','05'))
+        WHERE USER_NM = #{userNm}
+    </select>
+
+    <update id="cardReqCancel" parameterType="String" >
+        UPDATE TB_50171031
+        SET STATUS = '08'
+        WHERE ORDERID = #{value}
+        AND (STATUS = '01' OR STATUS = '05')
+    </update>
+
+    <select id="selectUserMobile" parameterType="String" resultType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+        SELECT
+            USER_MOBILE USERMOBILE,
+            USER_EMAIL USEREMAIL
+        FROM TB_50171031 WHERE ORDERID = #{value}
+    </select>
+
+    <update id="uptCardAtmPwd" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        UPDATE TB_50171031
+        SET ATM_PWD = #{atmPwd}
+        WHERE CARD_NO = #{cardNum}
+        AND ATM_PWD IS NULL
+    </update>
+
+    <select id="getCardAtmPwd" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+
+        SELECT
+            USER_EMAIL USEREMAIL,
+            CARD_NO CARDNUM,
+            CASE WHEN ATM_PWD IS NOT NULL THEN '****' ELSE ATM_PWD END ATMPWD
+        FROM TB_50171031 WHERE USER_EMAIL = #{userEmail} AND STATUS = '04'
+        AND ROWNUM = 1
+    </select>
+
+    <select id="getCardPwdconfirm" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM TB_50171031
+        WHERE CARD_NO = #{cardNum}
+        AND ATM_PWD = #{atmPwd}
+    </select>
+
+    <select id="getCardUserNm" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="String">
+        SELECT USER_NM USERNM FROM TB_10171020
+        WHERE USER_EMAIL = (
+            SELECT
+                USER_EMAIL USEREMAIL
+            FROM TB_50171031
+            WHERE CARD_NO = #{cardNum})
+    </select>
+
+    <insert id="plusCardPoint" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+        INSERT INTO TB_30171041 (
+            AST_PNT_CODE, REG_EMAIL, REG_DT,
+            UPT_EMAIL, UPT_DT, REG_IP,
+            UPT_IP, PNT_PRC, VLDT_DT,
+            USER_EMAIL, PNT_EVENT_NO)
+            VALUES (
+            FN_GEN_KEY('TB_30171041','AST_PNT_CODE','') /* AST_PNT_CODE */,
+            'admin@cmesoft.co.kr' /* REG_EMAIL */,
+            SYSDATE /* REG_DT */,
+            '' /* UPT_EMAIL */,
+            '' /* UPT_DT */,
+            '127.0.0.1' /* REG_IP */,
+            '' /* UPT_IP */,
+            10000/* PNT_PRC */,
+            TO_DATE('99991231000000','YYYYMMDDHH24MISS') /* VLDT_DT */,
+            #{userEmail}/* USER_EMAIL */
+            , 3
+       )
+    </insert>
+
+    <delete id="backCardPoint" parameterType="String">
+        DELETE TB_30171041 WHERE AST_PNT_CODE = (
+            SELECT AST_PNT_CODE FROM(
+            SELECT * FROM TB_30171041 WHERE USER_EMAIL = #{value} AND PNT_EVENT_NO = 3 order by reg_dt desc)
+        WHERE ROWNUM = 1)
+    </delete>
+
+    <update id="pointCash" parameterType="String">
+		UPDATE TB_10171029
+		  SET TOT_MNY = TOT_MNY + 10000
+		 WHERE
+          USER_EMAIL = #{value}
+	</update>
+
+    <update id="backPointCash" parameterType="String">
+		UPDATE TB_10171029
+		  SET TOT_MNY = TOT_MNY - 10000
+		 WHERE
+          USER_EMAIL = #{value}
+	</update>
+
+    <select id="getCardNo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="String">
+        SELECT CARD_NO FROM TB_50171030
+        WHERE
+            ORDERID = #{orderId} AND
+            USER_EMAIL = #{userEmail}
+    </select>
+
+    <update id="setCardNo" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO">
+        UPDATE TB_50171031
+        SET CARD_NO = #{cardNum}
+        WHERE ORDERID = #{orderId} AND
+              USER_EMAIL = #{userEmail}
+
+    </update>
+
+    <select id="userAmountCheck" parameterType="com.bitkrx.api.moaCard.vo.MoaCardReqVO" resultType="int">
+
+            SELECT COUNT(*) FROM(
+            SELECT * FROM TB_50171031 WHERE USER_EMAIL = #{userEmail} AND AMOUNT >= 10000 AND STATUS = #{status})
+            WHERE ROWNUM = 1
+    </select>
+
+    <select id="getMoaCoinInfo" parameterType="String" resultType="com.bitkrx.api.main.vo.CmeRealTimeCoinPriceResVO">
+        SELECT
+		    T.CMM_CD CURCYCD
+		    ,rtrim(to_char(NVL(FN_CUR_PRICE('S',T.CMM_CD),0),'FM99999999990.99999999'),'.') COINPRC
+		    ,(SELECT CMM_NM FROM TB_30171021 WHERE CMM_CD = T.CMM_CD) COINNM
+		FROM(
+		    SELECT * FROM TB_30171021
+		    WHERE CMM_CD = #{value}
+		    AND CMM_CD NOT IN ('CMMC00000000204','CMMC00000000248')
+		    AND USE_YN = 'Y') T
+		ORDER BY CURCYCD
+    </select>
+</mapper>

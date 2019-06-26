@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="publicDAO">
+    <resultMap type="HashMap" id="publicMAP">
+        <result property="currency" column="CURRENCY"/>
+        <result property="open_price" column="OPEN_PRICE"/>
+        <result property="min_price" column="MIN_PRICE"/>
+        <result property="max_price" column="MAX_PRICE"/>
+        <result property="close_price" column="CLOSE_PRICE"/>
+        <result property="avg_price" column="AVG_PRICE"/>
+        <result property="volume" column="VOLUME"/>
+        <result property="now_date" column="NOW_DATE"/>
+        <result property="buy_price" column="BUY_PRICE"/>
+        <result property="sell_price" column="SELL_PRICE"/>
+
+        <result property="bids_quantity" column="BIDS_QUANTITY"/>
+        <result property="bids_price" column="BIDS_PRICE"/>
+        <result property="asks_quantity" column="ASKS_QUANTITY"/>
+        <result property="asks_price" column="ASKS_PRICE"/>
+
+        <result property="currency_amount" column="CURRENCY_AMOUNT"/>
+        <result property="currency_price" column="CURRENCY_PRICE"/>
+        <result property="total_price" column="TOTAL_PRICE"/>
+        <result property="transaction_type" column="TRANSACTION_TYPE"/>
+        <result property="transaction_date" column="TRANSACTION_DATE"/>
+    </resultMap>
+
+    <select id="selectPublicCurrencyInfo" parameterType="String" resultMap="publicMAP">
+
+        WITH CURCYCD AS (
+                SELECT FN_CMM_CD(#{value }, '0') CN_KND_CD FROM DUAL
+        )
+        SELECT
+            TT.CURRENCY,
+                RTRIM(TO_CHAR(NVL(TT.OPEN_PRICE, 0),'FM99999999990.99999999'),'.') OPEN_PRICE,
+                RTRIM(TO_CHAR(NVL(TT.MIN_PRICE, 0),'FM99999999990.99999999'),'.') MIN_PRICE,
+                RTRIM(TO_CHAR(NVL(TT.MAX_PRICE, 0),'FM99999999990.99999999'),'.') MAX_PRICE,
+                RTRIM(TO_CHAR(NVL(TT.CLOSE_PRICE, 0),'FM99999999990.99999999'),'.') CLOSE_PRICE,
+                RTRIM(TO_CHAR(NVL(TT.AVG_PRICE, 0),'FM99999999990.99999999'),'.') AVG_PRICE,
+                RTRIM(TO_CHAR(NVL(TT.VOLUME, 0),'FM99999999990.99999999'),'.') VOLUME,
+--             TT.NOW_DATE,
+            (SELECT NVL(BUYTRANPRC, 0) FROM TB_SEL_BUY_LIST WHERE CN_KND_CD = TT.CN_KND_CD AND SEQ = 1) BUY_PRICE,
+            (SELECT NVL(SELLTRANPRC, 0) FROM TB_SEL_BUY_LIST WHERE CN_KND_CD = TT.CN_KND_CD AND SEQ = 1) SELL_PRICE
+        FROM (
+                 SELECT
+                     CN_KND_CD,
+                     FN_CMM_CD(T1.CN_KND_CD, '') CURRENCY,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT) OPEN_PRICE,
+                     MIN(EX_CN_PRC) MIN_PRICE,
+                     MAX(EX_CN_PRC) MAX_PRICE,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) CLOSE_PRICE,
+                     ROUND(AVG(EX_CN_PRC), 3) AVG_PRICE,
+                     SUM(CN_EXCHG_AMT) VOLUME
+                     -- (SELECT SUM(CN_EXCHG_AMT) FROM TB_20171030 WHERE EX_CN_KND_CD = T2.EX_CN_KND_CD AND REG_DT BETWEEN SYSDATE - 7 AND SYSDATE) VOLUME_7DAY,
+--                      TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') NOW_DATE
+                 FROM CURCYCD T1, TB_20171030 T2
+                 WHERE T1.CN_KND_CD = T2.EX_CN_KND_CD(+)
+                       AND REG_DT BETWEEN SYSDATE - 1 AND SYSDATE
+             ) TT
+    </select>
+
+    <select id="selectPublicOrderCurrencyInfo" parameterType="String" resultMap="publicMAP">
+
+        WITH CURCYCD AS (
+            SELECT FN_CMM_CD(#{value }, '0') CN_KND_CD FROM DUAL
+        )
+        SELECT
+            RTRIM(TO_CHAR(T1.BUYCNAMT,'FM99999999990.99999999'),'.') BIDS_QUANTITY,
+            RTRIM(TO_CHAR(T1.BUYTRANPRC,'FM99999999990.99999999'),'.') BIDS_PRICE,
+            RTRIM(TO_CHAR(T1.SELLCNAMT,'FM99999999990.99999999'),'.') ASKS_QUANTITY,
+            RTRIM(TO_CHAR(T1.SELLTRANPRC,'FM99999999990.99999999'),'.') ASKS_PRICE
+        FROM TB_SEL_BUY_LIST T1, CURCYCD T2 WHERE T1.CN_KND_CD = T2.CN_KND_CD
+
+    </select>
+
+    <select id="selectPublicOrderCompleteInfo" parameterType="String" resultMap="publicMAP">
+
+        SELECT TT.* FROM(
+            WITH CURCYCD AS (
+                SELECT FN_CMM_CD(#{value }, '0') CN_KND_CD FROM DUAL
+            )
+            SELECT
+                TO_CHAR(T1.REG_DT, 'YYYY-MM-DD HH24:MI:SS') TRANSAXTION_DATE,
+                CASE
+                    WHEN T1.EX_FLAG = 'B' THEN 'bid'
+                    ELSE 'ask'
+                END TRANSAXTION_TYPE,
+                RTRIM(TO_CHAR(T1.CN_EXCHG_AMT,'FM99999999990.99999999'),'.') CURRENCY_AMOUNT,
+                RTRIM(TO_CHAR(T1.EX_CN_PRC,'FM99999999990.99999999'),'.') CURRENCY_PRICE,
+                RTRIM(TO_CHAR(T1.EX_TOT_PRC,'FM99999999990.99999999'),'.') TOTAL_PRICE
+            FROM TB_20171030 T1, CURCYCD T2 WHERE T1.EX_CN_KND_CD = T2.CN_KND_CD
+            ORDER BY T1.REG_DT DESC) TT
+        WHERE ROWNUM <![CDATA[ <= ]]> 20
+
+    </select>
+
+</mapper>

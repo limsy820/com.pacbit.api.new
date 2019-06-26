@@ -1,0 +1,840 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="userDAO">
+
+    <resultMap id="userMap" type="hashmap"/>
+
+	<select id="userAssetList" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.main.vo.CmeUserAssetResVO">
+
+
+
+				SELECT
+			             #{curcyCd} as curcyCd,
+			             T.impCnAmt,
+			             NVL (FN_CHK_CN_AMT (#{userEmail},#{curcyCd}), '0')  - T.impCnAmt posCnAmt,  /*거래가능 COIN */
+			             TO_CHAR(NVL (FN_CHK_CN_AMT (#{userEmail},#{curcyCd}), '0'), 'FM99999999990.00000000') TOTCOINAMT,
+			             T.impCnAmt * FN_CUR_PRICE('', #{curcyCd}) posCnPrc,
+			             TRUNC(FN_CUR_PRICE('', #{curcyCd}) *
+			             (NVL (FN_CHK_CN_AMT (#{userEmail},#{curcyCd}), '0')  - T.impCnAmt)) IMPCNPRC,
+			             TRUNC(NVL (FN_CHK_CN_AMT (#{userEmail},#{curcyCd}), '0') * FN_CUR_PRICE('', #{curcyCd})) KWDPRC
+			  FROM(
+			             SELECT TO_CHAR(SELAMT, 'FM99999999990.00000000') IMPCNAMT FROM(
+
+	             (SELECT
+	                     NVL (
+	                       (SELECT
+	                            SUM(SEL_AMT) - SUM(CN_EXCHG_AMT)
+	                        FROM
+	                            VW_IS_SEL_INFO
+	                        WHERE
+	                            IS_SOLD_OUT = 'N'
+	                        AND
+	                                SEL_USER_EMAIL = #{userEmail}
+	                        AND
+	                                CN_KND_CD = #{curcyCd}), '0') AS SELAMT/*거래중인 COIN*/
+
+	                FROM DUAL))) T
+
+
+
+
+
+   </select>
+
+   	<select id="assetKrw" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.main.vo.CmeUserAssetResVO">
+		SELECT
+         #{curcyCd} curcyCd,
+         NVL(FN_MNY_CHK(#{userEmail}),'0') as posCnPrc ,
+         NVL(FN_RTN_BUY_PRC(#{userEmail}) + FN_RTN_SVC_PRC(#{userEmail}),'0') as impCnPrc,
+         NVL(FN_MNY_CHK(#{userEmail})+FN_RTN_BUY_PRC(#{userEmail}) + FN_RTN_SVC_PRC(#{userEmail}),'0') as totCoinAmt,
+         NVL(FN_MNY_CHK(#{userEmail})+FN_RTN_BUY_PRC(#{userEmail}) + FN_RTN_SVC_PRC(#{userEmail}),'0') as kwdPrc
+        FROM DUAL
+   </select>
+
+   	<select id="assetPoint" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.main.vo.CmeUserAssetResVO">
+		SELECT
+         #{curcyCd} as curcyCd,
+         NVL(FN_GETPNT(#{userEmail}),'0') as posCnPrc ,
+         NVL(FN_RTN_PNT_PRC(#{userEmail}),'0') as impCnPrc,
+         NVL(FN_GETPNT(#{userEmail})+FN_RTN_PNT_PRC(#{userEmail}),'0') as totCoinAmt,
+         NVL(FN_GETPNT(#{userEmail})+FN_RTN_PNT_PRC(#{userEmail}),'0') as kwdPrc
+        FROM DUAL
+   </select>
+
+   <select id="userCoinList" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.main.vo.CmeUserAssetResVO">
+        WITH COIN_LST AS
+       (
+              SELECT * FROM (
+              SELECT
+                T1.CMM_CD CN_KND_CD1
+                , (SELECT FN_CUR_PRICE ('', T1.CMM_CD) FROM DUAL) CN_PRC
+                , T1.CMM_NM CN_KND_NM
+                , T1.CMM_SN
+            FROM TB_30171021 T1
+            WHERE T1.CMM_UPPER_CD = 'CMMP00000000043'
+              AND T1.CMM_CD NOT IN ('CMMC00000000248', 'CMMC00000000204','CMMC00000001086','CMMC00000001005')
+              AND T1.USE_YN = 'Y'
+         UNION ALL
+            SELECT 'CMMC00000001005' CN_KND_CD1, 0 CN_PRC, 'BMC' CN_KND_NM , 21 CMM_SN FROM DUAL
+         UNION ALL
+            SELECT 'CMMC00000001086' CN_KND_CD1, 0 CN_PRC, 'USDT' CN_KND_NM , 1 CMM_SN FROM DUAL
+    )AA
+    WHERE 1=1
+    ORDER BY AA.CN_KND_CD1
+       )
+       SELECT T1.CURCYCD,
+           FN_CMM_CD(T1.CURCYCD , '') CNKNDNM,
+           TO_CHAR (NVL (POSCNAMT, '0'), 'FM999999999999990.00000000') POSCNAMT,
+           TO_CHAR (NVL (IMPCNAMT, '0'), 'FM999999999999990.00000000') IMPCNAMT,
+           TO_CHAR (NVL (POSCNPRC, '0'), 'FM999999999999990') - PNT_PRC POSCNPRC,
+           TO_CHAR (NVL (IMPCNPRC, '0'), 'FM999999999999990') IMPCNPRC,
+           TO_CHAR (NVL (KWDPRC, '0'), 'FM999999999999990') KWDPRC,
+           TO_CHAR (NVL (TOTCOINAMT, '0'), 'FM999999999999990.00000000') TOTCOINAMT,
+           NVL(PNT_PRC, 0) PNTPRC,
+           TO_CHAR (NVL (TRUST_AMT, '0'), 'FM999999999999990.00000000') TRUSTAMT,
+           TO_CHAR (NVL (TRUSTPRC, '0'), 'FM999999999999990.00000000') TRUSTPRC,
+           TO_CHAR (NVL (TR_LIMT_AMT, '0'), 'FM999999999999990.00000000') TRLIMTAMT,
+           NVL(CMM_SN, 99) CMMSN
+       FROM (SELECT CMM_CD CURCYCD,
+                    CMM_SN
+             FROM TB_30171021
+             WHERE     CMM_UPPER_CD = 'CMMP00000000043'
+                       AND USE_YN = 'Y'
+                       AND CMM_CD != 'CMMC00000000248') T1,
+           (SELECT CN_KND_CD CURCYCD,
+                CMMSN,
+                   POS_AMT POSCNAMT,
+                   USE_AMT IMPCNAMT,
+                   CNPRC * POS_AMT POSCNPRC,
+                   CNPRC * USE_AMT IMPCNPRC,
+                   CNPRC * (POS_AMT + USE_AMT) KWDPRC,
+                   POS_AMT + USE_AMT + TRUST_AMT TOTCOINAMT,
+                   0 PNT_PRC,
+                   TRUST_AMT,
+                   CNPRC * TRUST_AMT TRUSTPRC,
+                   TR_LIMT_AMT
+            FROM (SELECT (SELECT CN_PRC
+                          FROM COIN_LST aa
+                          WHERE aa.CN_KND_CD1 = CN_KND_CD)
+                                                             CNPRC,
+                         (SELECT CMM_SN
+                          FROM COIN_LST aa
+                          WHERE aa.CN_KND_CD1 = CN_KND_CD)
+                                                             CMMSN,
+                      USER_EMAIL,
+                      TOT_AMT,
+                      EX_AMT,
+                         (TOT_AMT + EX_IN_AMT)
+                         - TOT_SEL_AMT
+                         + CNCL_AMT
+                         - BUY_FEE_AMT
+                                                             POS_AMT,
+                         TOT_SEL_AMT - EX_OUT_AMT - CNCL_AMT USE_AMT,
+                      EX_IN_AMT,
+                      EX_OUT_AMT,
+                      BUY_FEE_AMT,
+                      TOT_SEL_AMT,
+                      CNCL_AMT,
+                      CN_KND_CD,
+                      TRUST_AMT,
+                      TR_LIMT_AMT
+                  FROM TB_10171028
+                  WHERE USER_EMAIL = #{userEmail})
+            UNION ALL
+            SELECT 'CMMC00000000204' CURCYCD,
+                   2 CMMSN,
+                   0 POSCNAMT,
+                   0 IMPCNAMT,
+                   REM_MNY POSCNPRC,
+                   USING_MNY IMPCNPRC,
+                   REM_MNY + USING_MNY KWDPRC,
+                   0 TOTCOINPAMT,
+                   NVL (FN_GETPNT (#{userEmail}), 0) PNT_PRC,
+                   0 TRUSTAMT,
+                   0 TRUSTPRC,
+                   TR_LIMT_AMT TRLIMTAMT
+            FROM VW_MNY_INFO
+            WHERE USER_EMAIL = #{userEmail}) T2
+       WHERE T1.CURCYCD = T2.CURCYCD(+)
+       ORDER BY CMMSN
+   </select>
+
+
+   <select id="getUserMny" parameterType="com.bitkrx.api.main.vo.UserAssetVO" resultType="com.bitkrx.api.main.vo.UserAssetVO">
+
+		SELECT
+			    T1.CURCYCD,
+			    NVL(T2.POSCNAMT, 0) POSCNAMT,
+			    NVL(T2.IMPCNAMT, 0) IMPCNAMT,
+			    NVL(T2.POSCNPRC, 0) POSCNPRC,
+			    NVL(T2.IMPCNPRC, 0) IMPCNPRC,
+			    NVL(T2.KWDPRC, 0) KWDPRC,
+			    NVL(T2.TOTCOINAMT, 0) TOTCOINAMT
+		FROM
+			(SELECT 'CMMC00000000204' CURCYCD FROM DUAL) T1,
+			(SELECT
+			    'CMMC00000000204' CURCYCD,
+			    0 POSCNAMT,
+			    0 IMPCNAMT,
+			    REM_MNY POSCNPRC,
+			    USING_MNY IMPCNPRC,
+			    REM_MNY + USING_MNY KWDPRC,
+			    0 TOTCOINAMT
+			FROM VW_MNY_INFO WHERE USER_EMAIL = #{userEmail}) T2
+			WHERE T1.CURCYCD = T2.CURCYCD(+)
+   </select>
+
+   <select id="getUserCoin" parameterType="com.bitkrx.api.main.vo.UserAssetVO" resultType="com.bitkrx.api.main.vo.UserAssetVO">
+
+		SELECT
+		    T2.USEREMAIL,
+		    NVL(T2.TOTAMT, 0) TOTAMT,
+		    NVL(T2.BUYFEEAMT, 0) BUYFEEAMT,
+		    NVL(T2.USEAMT, 0) USEAMT,
+		    T1.CURCYCD,
+		    NVL(T2.EXINAMT, 0) EXINAMT,
+		    NVL(T2.EXOUTAMT, 0) EXOUTAMT,
+		    NVL(T2.EXAMT, 0) EXAMT,
+		    NVL(T2.CNCLAMT, 0) CNCLAMT,
+		    NVL(T2.TOTSELAMT, 0) TOTSELAMT,
+		    NVL(T2.CNPRC, 0) CNPRC
+		FROM
+		    (SELECT CMM_CD CURCYCD FROM TB_30171021 WHERE CMM_UPPER_CD = 'CMMP00000000043' AND USE_YN = 'Y') T1,
+			(SELECT
+			        USER_EMAIL USEREMAIL,
+			        TOT_AMT TOTAMT,
+			        BUY_FEE_AMT BUYFEEAMT,
+			        USE_AMT USEAMT,
+			        CN_KND_CD CURCYCD,
+			        EX_IN_AMT EXINAMT,
+			        EX_OUT_AMT EXOUTAMT,
+			        EX_AMT EXAMT,
+			        CNCL_AMT CNCLAMT,
+			        TOT_SEL_AMT TOTSELAMT,
+			        FN_CUR_PRICE ('', CN_KND_CD) CNPRC
+			     FROM TB_10171028
+			WHERE USER_EMAIL = #{userEmail}) T2
+		WHERE T1.CURCYCD = T2.CURCYCD(+)
+   </select>
+
+   <update id="insUptIpList" parameterType="com.bitkrx.api.auth.vo.UserIpVO">
+   		MERGE INTO TB_10171088
+		    USING DUAL
+		    ON (USER_EMAIL = #{userEmail}
+		        AND IP = #{ip})
+		WHEN MATCHED THEN
+		    UPDATE
+		    SET
+		        LIMT_HR     =   #{limtHr},
+		        UPT_DT      =   SYSDATE,
+		        UPT_EMAIL   =   #{userEmail}
+		WHEN NOT MATCHED THEN
+		    INSERT (
+		        USER_EMAIL, IP, LIMT_HR,
+		        REG_DT, REG_EMAIL,
+		        UPT_DT, UPT_EMAIL
+		    )
+		    VALUES (
+		        #{userEmail},   #{ip},    #{limtHr},
+		        SYSDATE,    #{userEmail},
+		        SYSDATE,    #{userEmail}
+		    )
+   </update>
+
+
+   <select id="selectUserIp" parameterType="com.bitkrx.api.auth.vo.UserIpVO" resultType="int">
+   	 	SELECT COUNT(*) CNT
+   		FROM TB_10171088
+ 		WHERE
+		USER_EMAIL = #{userEmail}
+		<if test="ip != null and ip != '' ">
+		AND IP = #{ip}
+		</if>
+		AND SYSDATE <![CDATA[  <  ]]>  UPT_DT + LIMT_HR/24
+   </select>
+
+   <select id="selectUserIpList" parameterType="com.bitkrx.api.auth.vo.UserIpVO" resultType="com.bitkrx.api.auth.vo.UserIpVO">
+
+		SELECT
+		    T1.USER_EMAIL USEREMAIL,
+		    T1.IP,
+		    T1.LIMT_HR LIMTHR,
+		    T2.LOGIN_TME LOGINTM,
+		    TO_CHAR(T1.REG_DT, 'YYYY-MM-DD HH24:MI:SS') STDDT,
+    		TO_CHAR(T1.REG_DT + LIMT_HR/24, 'YYYY-MM-DD HH24:MI:SS') ENDDT
+		FROM TB_10171088 T1, (SELECT CONN_IP, MAX(LOGIN_TME) LOGIN_TME FROM TB_10171025 GROUP BY CONN_IP) T2
+		WHERE
+		T1.USER_EMAIL = #{userEmail}
+		AND T1.IP = T2.CONN_IP(+)
+		<if test="ip != null and ip != '' ">
+		AND T1.IP = #{ip}
+		</if>
+		AND SYSDATE <![CDATA[  <  ]]>  UPT_DT + LIMT_HR/24
+        ORDER BY T2.LOGIN_TME DESC
+   </select>
+
+   <select id="getUserLangCd" parameterType="String" resultType="String">
+   		SELECT
+		    NVL(LANG_CD, 'ko') LANGCD
+		FROM TB_10171020 WHERE USER_EMAIL = #{value}
+   </select>
+
+   <select id="selectUserMaskingList" parameterType="String" resultType="com.bitkrx.api.auth.vo.UserMaskingVO">
+   		SELECT
+		    USER_EMAIL USEREMAIL,
+		    SUBSTR(USER_NM,1,1) || LPAD('*',LENGTH(USER_NM)-2,'*') || SUBSTR(USER_NM, LENGTH(USER_NM), 1) USERNM,
+		    SUBSTR(USER_MOBILE,1,3) || LPAD('*',4,'*') || SUBSTR(USER_MOBILE, LENGTH(USER_MOBILE) - 3, 4) USERMOBILE
+		FROM TB_10171020
+		WHERE USER_MOBILE LIKE '%' || #{value}
+   </select>
+
+	<update id="uptOtpSerial" parameterType="com.bitkrx.api.googleOtp.vo.GooglOtpVO">
+
+		UPDATE TB_10171021 SET OTP_SERIAL = #{encodedKey} WHERE USER_EMAIL = #{userEmail}
+
+	</update>
+
+    <select id="getUserInfo" parameterType="com.bitkrx.api.auth.vo.UserInfoVO" resultType="com.bitkrx.api.auth.vo.UserInfoVO">
+        SELECT
+            T1.USER_EMAIL USEREMAIL,
+            T1.SUB_USER_EMAIL SUBUSEREMAIL,
+            T1.USER_NM USERNM,
+            T1.USER_MOBILE USERMOBILE,
+            T1.RCMD_CODE RCMDCODE,
+            T1.GENDER,
+            T1.POST_CD POSTCD,
+            T1.ADRS,
+            T1.DTL_ADRS DTLADRS,
+            TO_CHAR(T1.BIRTH_DAY, 'YYYYMMDD') BIRTHDAY,
+            T2.COUNTRY_CD COUNTRYCD,
+            T2.COUNTRY_NM COUNTRYNM,
+            T3.RCMD_NM RCMDNM,
+            T3.RCMD_USER_CODE RCMDUSERCODE,
+            T3.RCMD_USER_CODE_EN RCMDUSERCODEEN,
+            T1.BRH_CODE BRHCODE,
+            T4.NATN_CODE NATNCODE,
+            T1.LANG_CD LANGCD
+        FROM TB_10171020 T1, TB_50171004 T2, TB_50171002 T3 , TB_50171001 T4
+        WHERE T1.COUNTRY_CD = T2.COUNTRY_CD(+)
+        AND T1.RCMD_CODE = T3.RCMD_CODE(+)
+        AND T1.BRH_CODE  = T4.BRH_CODE(+)
+        AND USER_EMAIL  = #{userEmail}
+
+    </select>
+
+    <select id="getCountryList" resultType="com.bitkrx.api.auth.vo.CountryVO">
+
+        SELECT
+            COUNTRY_CD COUNTRYCD,
+            COUNTRY_NM COUNTRYNM
+        FROM TB_50171004
+        ORDER BY REG_DT
+</select>
+
+    <select id="getNatnBankList" parameterType="com.bitkrx.api.auth.vo.UserInfoVO" resultType="com.bitkrx.api.auth.vo.NatnBankVO">
+
+        SELECT
+            NBANK_CODE NATNBANKCODE,
+            <choose>
+                <when test="langCd == 'ko' ">
+                    NBANK_NM BANKNM
+                </when>
+                <otherwise>
+                    NBANK_NM_EN BANKNM
+                </otherwise>
+            </choose>
+        FROM TB_501710051 WHERE USE_YN= 'Y'
+    </select>
+
+    <update id="INSUPT10171021" parameterType="hashmap" statementType="CALLABLE">
+
+		{ CALL PR_INSUPT10171021
+			(
+				#{emailCertYn },
+                <choose>
+                    <when test="emailCertYn != '' ">
+                        SYSDATE
+                    </when>
+                    <otherwise>
+                        ''
+                    </otherwise>
+                </choose>,
+				#{smsCertYn },
+                <choose>
+                    <when test="smsCertYn != '' ">
+                        SYSDATE
+                    </when>
+                    <otherwise>
+                        ''
+                    </otherwise>
+                </choose>,
+				#{otpSerial },
+				#{userEmail },
+                #{kycCertYn },
+                '', /*수정자*/
+                ' ',
+                #{otpCertYn},
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=userMap}
+			)
+		}
+
+	</update>
+
+    <update id="INSUPT10171022" parameterType="hashmap" statementType="CALLABLE">
+        { CALL PR_INSUPT10171022
+            (
+                #{userEmail },
+                <choose>
+                    <when test="bankCd != ''">
+                        #{bankCd }
+                    </when>
+                    <otherwise>
+                        ' '
+                    </otherwise>
+                </choose>,
+                <choose>
+                    <when test="bankAccNo != ''">
+                        #{bankAccNo }
+                    </when>
+                    <otherwise>
+                        ' '
+                    </otherwise>
+                </choose>,
+                #{accntNm },
+                'Y',
+                'Y',
+                '',
+                #{useYn},
+                #{regIp },
+                #{userEmail },
+                #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=userMap}
+            )
+        }
+
+    </update>
+
+    <select id="getMailCode" resultType="String">
+    	SELECT FN_GEN_KEY('TB_10171011','SND_CODE','') FROM DUAL
+    </select>
+
+    <insert id="insertSendEmailCust" parameterType="com.bitkrx.api.auth.vo.SendEmailCustVO">
+        INSERT INTO TB_10171011
+        (snd_code , user_email , snd_dt , snd_yn , ctnts_code)
+        VALUES
+        (
+            #{sndCode},
+            #{userEmail},
+            TO_CHAR(SYSDATE, 'YYYY/MM/DD HH24:MI:SS'),
+            #{sndYn},
+            #{ctntsCode}
+        )
+    </insert>
+
+    <select id="getAdminLangCd" parameterType="String" resultType="String">
+        SELECT
+          T3.NATN_CODE
+        FROM
+            TB_10171050 T1
+            , TB_10171043 T2
+            , TB_10171042 T3
+        WHERE 1=1
+        AND T1.USER_EMAIL = T2.USER_EMAIL
+        AND T2.USRGRP_CODE = T3.USRGRP_CODE
+        AND T1.USER_EMAIL = #{value}
+    </select>
+
+    <select id="getAuthParCodeList" resultType="com.bitkrx.api.auth.vo.AuthCodeListVO">
+
+        SELECT
+            CMM_CD CMMCD,
+            CMM_DESC CMMDESC,
+            CMM_UPPER_CD CMMUPPERCD,
+            CMM_NM CMMNM
+        FROM TB_30171021 WHERE FILTER1 = 'AUTH'
+        AND USE_YN = 'Y'
+        ORDER BY CMM_CD
+    </select>
+
+    <select id="getAuthChiCodeList" parameterType="String" resultType="com.bitkrx.api.auth.vo.AuthCodeListVO">
+
+        SELECT
+            CMM_CD CMMCD,
+            CMM_DESC CMMDESC,
+            CMM_UPPER_CD CMMUPPERCD,
+            CMM_NM CMMNM
+        FROM TB_30171021
+        WHERE CMM_UPPER_CD = #{upperCmmCd}
+        AND USE_YN = 'Y'
+        ORDER BY CMM_CD
+    </select>
+
+    <select id="mobileChkCnt" parameterType="String" resultType="int">
+        SELECT
+          COUNT(*)
+        FROM
+          TB_10171020
+        WHERE
+          USER_MOBILE = #{value}
+    </select>
+
+    <select id="getUserSubEmail" parameterType="String" resultType="String">
+        SELECT
+            SUB_USER_EMAIL subUserEmail
+        FROM
+            TB_10171020
+        WHERE
+            USER_EMAIL = #{value}
+    </select>
+
+    <select id="selectUserAuth" parameterType="com.bitkrx.api.auth.vo.AuthVO" resultType="com.bitkrx.api.auth.vo.AuthVO">
+        SELECT T1.EMAIL_CERT_YN as emailCertYn,
+                TO_CHAR(T1.EMAIL_CERT_DT,'YYYY/MM/DD HH24:MI:SS')as emailCertDt,
+                T1.SMS_CERT_YN as smsCertYn,
+                TO_CHAR(T1.SMS_CERT_DT,'YYYY/MM/DD HH24:MI:SS')as smsCeryDt,
+                T1.OTP_SERIAL as otpSerial,
+                T1.USER_EMAIL as user_email,
+                T1.KYC_CERT_YN as kycCertYn,
+                T1.KYC_UPT_EMAIL as kycUptEmail,
+                T1.OTP_CERT_YN as otpCertYn,
+                TO_CHAR(T1.KYC_UPT_DT,'YYYY/MM/DD HH24:MI:SS') as kycUptDt,
+                T3.BANK_ACC_NO as bankAccNo
+         FROM TB_10171021 T1 , TB_10171022 T3
+         WHERE 1=1
+         AND  T1.USER_EMAIL = T3.USER_EMAIL(+)
+         AND T1.USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getTradeCoinUseYn" parameterType="com.bitkrx.api.auth.vo.UserTradeCheckVO" resultType="String">
+        SELECT
+            SEL_USE_YN
+        FROM
+            TB_50171050
+        WHERE
+            MK_CN_KND_CD = #{mkState}
+        AND
+            USE_CN_KND_CD = #{curcyCd}
+    </select>
+
+    <select id="getUserTradeCheck" parameterType="com.bitkrx.api.auth.vo.UserTradeCheckVO" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            TB_50171064
+        WHERE
+            MK_CN_KND_CD = #{mkState}
+        AND
+            CN_KND_CD = #{curcyCd}
+        AND
+            USER_EMAIL = #{userEmail}
+        AND
+            TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN STD_DT AND END_DT + 1 - 1 / 24 / 60 / 60
+        AND
+            SEL_USE_YN = #{selUseYn}
+    </select>
+
+    <select id="krwUseYnCheck" parameterType="String" resultType="String">
+        SELECT
+          USE_YN
+        FROM
+          TB_10171020
+        WHERE
+          USER_EMAIL = #{value}
+    </select>
+
+    <select id="getSmsCertCheck" parameterType="String" resultType="String">
+        SELECT CERT_YN FROM(
+            SELECT
+                CERT_YN
+            FROM
+                TB_50171033
+            WHERE
+                USER_EMAIL = #{value}
+                AND
+                CERT_SUB_GRADE = 'CMMC00000001326'
+            ORDER BY REG_DT DESC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getForeignIpCheck" parameterType="String" resultType="com.bitkrx.api.auth.vo.ForeignIpVO">
+        SELECT
+           IP,
+           INTERNAL_YN INTERNALYN
+        FROM
+           TB_50171071
+        WHERE
+           IP = #{value}
+    </select>
+
+    <insert id="insertCheckIp" parameterType="com.bitkrx.api.auth.vo.ForeignIpVO">
+        INSERT INTO
+            TB_50171071(
+                IP , INTERNAL_YN , REG_DT
+              )
+        VALUES(
+                #{ip} , #{internalYn} , SYSDATE
+             )
+    </insert>
+
+    <select id="getUserFunc" parameterType="String" resultType="com.bitkrx.api.auth.vo.UserFuncAuthVO">
+        SELECT
+                USER_EMAIL USEREMAIL,
+                NOLIMT_YN NOLIMTYN,
+                SET_MSG SETMSG,
+                CANCEL_MSG CANCELMSG
+        FROM
+                TB_50171066
+        WHERE
+                USE_YN = 'Y'
+        AND
+                USER_EMAIL = #{value}
+    </select>
+
+    <select id="getUserFuncDt" parameterType="String" resultType="int">
+        SELECT
+             COUNT(*)
+        FROM
+             TB_50171066
+        WHERE
+             USER_EMAIL = #{value}
+        AND
+             NOLIMT_YN = 'N'
+        AND
+             USE_YN = 'Y'
+        AND
+             TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN STD_DT AND END_DT + 1 - 1 / 24 / 60 / 60
+    </select>
+
+
+    <update id="uptAccCertYn" parameterType="com.bitkrx.api.auth.vo.UserAuthVO">
+      UPDATE TB_10171022 SET CERT_YN = #{accCertYn} WHERE USER_EMAIL = #{userEmail}
+    </update>
+
+    <update id="uptSmsCertYn" parameterType="com.bitkrx.api.auth.vo.UserAuthVO">
+      UPDATE TB_10171021 SET SMS_CERT_YN = #{smsCertYn} WHERE USER_EMAIL = #{userEmail}
+    </update>
+
+    <update id="uptKycCertYn" parameterType="com.bitkrx.api.auth.vo.UserAuthVO">
+      UPDATE TB_10171021 SET KYC_CERT_YN = #{kycCertYn} WHERE USER_EMAIL = #{userEmail}
+    </update>
+
+    <update id="uptOtpCertYn" parameterType="com.bitkrx.api.auth.vo.UserAuthVO">
+      UPDATE TB_10171021 SET OTP_CERT_YN = #{otpCertYn} WHERE USER_EMAIL = #{userEmail}
+    </update>
+
+    <select id="getUserCertification" parameterType="com.bitkrx.api.auth.vo.UserInfoVO" resultType="com.bitkrx.api.auth.vo.UserInfoVO">
+        SELECT
+            USER_EMAIL USEREMAIL,
+            TEL_NO TELNO,
+            TEL_CERT_YN TELCERTYN,
+            TO_CHAR(TEL_CERT_DT, 'YYYY-MM-DD HH24:MI:SS') TELCERTDT
+        FROM TB_101710211
+        WHERE USER_EMAIL  = #{userEmail}
+
+    </select>
+
+   <!-- <select id="getBotSellList" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+        SELECT CN_PHS_CODE CNPHSCODE, REG_EMAIL USEREMAIL , NVL(CSH_PRC, 0) - NVL(EX_BUY_PRC, 0) REMPRC   FROM TB_30171043
+            WHERE
+            CN_KND_CD = 'CMMC00000000208'
+        AND IS_BUY_ALL = 'N' ORDER BY REG_DT DESC
+    </select>-->
+
+    <update id="uptBotBuyList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+      UPDATE TB_30171043
+          SET IS_BUY_ALL = 'Y' ,
+              CNCL_BUY_PRC = NVL(CNCL_BUY_PRC , 0) + #{remPrc2}
+          WHERE CN_PHS_CODE = #{cnPhsCode}
+          AND USER_EMAIL = #{userEmail}
+    </update>
+
+    <update id="uptBotMoneyList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+        UPDATE TB_10171029
+          SET CNCL_BUY_PRC = CNCL_BUY_PRC + #{remPrc2}
+          WHERE USER_EMAIL = #{userEmail}
+    </update>
+
+    <select id="getCoinBuyCheck" parameterType="com.bitkrx.api.auth.vo.UserTradeCheckVO" resultType="com.bitkrx.api.auth.vo.UserTradeCheckVO">
+        SELECT
+          NVL(BUY_USE_YN,'N') buyUseYn
+          , MK_CN_KND_CD mkKndCd
+          , USE_CN_KND_CD cnKndCd
+          , FN_CMM_CD(USE_CN_KND_CD, '') cnKndNm
+          , NVL(BUY_LMT_ASKING, 0) buyLmtAsking
+          , NVL(BUY_LMT_RATE, 0) buyLmtRate
+        FROM
+          TB_50171050
+        WHERE
+          MK_CN_KND_CD = #{mkKndCd}
+        AND
+          USE_CN_KND_CD = #{cnKndCd}
+    </select>
+
+    <update id="uptUserInfo" parameterType="String">
+        UPDATE TB_10171021
+          SET USER_INFO_YN = 'S'
+        WHERE
+          USER_EMAIL = #{value}
+    </update>
+
+    <update id="uptInfoYn" parameterType="com.bitkrx.api.auth.vo.UserAuthVO">
+        UPDATE
+          TB_10171021
+        SET
+          USER_INFO_YN = #{userInfoYn}
+        WHERE
+          USER_EMAIL = #{userEmail}
+    </update>
+
+    <select id="getOtpYn" resultType="String">
+    	SELECT
+    		OTP_USE_YN
+    	FROM
+    		TB_50171061
+    </select>
+
+    <select id="getOtpAuthCountry" resultType="com.bitkrx.api.auth.vo.UserOtpCheckVO">
+    	SELECT
+    		OTP_ETC_CD OTPETCCD ,
+    		ETC_GUBUN ETCGUBUN,
+    		REG_EMAIL USEREMAIL
+    	FROM
+    		TB_50171062
+    	WHERE
+    		ETC_GUBUN = 'C'
+    </select>
+
+    <select id="countException" parameterType="String" resultType="int">
+    	SELECT
+    		COUNT(*)
+    	FROM
+    		TB_50171062
+    	WHERE
+    		ETC_GUBUN = 'U'
+    	AND
+    		OTP_ETC_CD = #{value}
+    </select>
+
+    <select id="getUserCountryCd" parameterType="String" resultType="String">
+    	SELECT
+    		COUNTRY_CD
+    	FROM
+    		TB_10171020
+    	WHERE
+    		USER_EMAIL = #{value}
+    </select>
+
+    <select id="getLogoUrl" parameterType="String" resultType="String">
+      SELECT
+             BI BI
+      FROM
+            TB_COMMON_EXCHG_INFO
+       WHERE
+       UPPER(CN_LANG_CODE) = UPPER(#{value})
+
+    </select>
+
+    <select id="getFileSn" parameterType="String" resultType="com.bitkrx.api.auth.vo.CommonVO">
+        SELECT
+        FILE_STRE_COURS FILESTRECOURS,
+        STRE_FILE_NM STREFILENM
+        FROM LETTNFILEDETAIL
+        WHERE ATCH_FILE_ID = #{value}
+    </select>
+
+    <select id="selectPopUpList" parameterType="com.bitkrx.api.auth.vo.PopUpVO" resultType="com.bitkrx.api.auth.vo.PopUpVO">
+          SELECT
+            *
+            FROM(
+                SELECT
+                    ROWNUM AS NO
+                    ,T.*
+                    FROM(
+                        SELECT
+                            POP_CODE AS POPCODE,
+                            POP_NM AS POPNM,
+                            POP_DESC POPDESC,
+                            POP_URL POPURL,
+                            TO_CHAR(STR_DT,'YYYY-MM-DD HH24:MI:SS') AS STRDT,
+                            TO_CHAR(END_DT,'YYYY-MM-DD HH24:MI:SS') AS ENDDT,
+                            REPLACE(USE_YN,' ','') AS USEYN,
+                            REG_EMAIL AS USEREMAIL,
+                            REG_DT AS REGDT,
+                            ATCH_FILE_ID AS ATCHFILEID,
+                            LANG_CD AS LANGCD,
+                            DAY_OPEN_YN AS DAYOPENYN
+                        FROM TB_10171072
+                        WHERE 1=1
+                         AND USE_YN = 'Y'
+                         AND LANG_CD = #{langCd}
+                            AND sysdate <![CDATA[  >=  ]]> STR_DT
+                            AND sysdate <![CDATA[  <=  ]]> END_DT
+                        ORDER BY REG_DT DESC , END_DT DESC
+                )T
+            )TT
+            WHERE TT.NO BETWEEN 1 AND 3
+    </select>
+
+    <select id="selectPopUpListCnt" parameterType="com.bitkrx.api.auth.vo.PopUpVO" resultType="int">
+          SELECT
+            COUNT(*)
+            FROM(
+                SELECT
+                    ROWNUM AS NO
+                    ,T.*
+                    FROM(
+                        SELECT
+                            POP_CODE AS POPCODE,
+                            POP_NM AS POPNM,
+                            POP_DESC POPDESC,
+                            POP_URL POPURL,
+                            TO_CHAR(STR_DT,'YYYY-MM-DD HH24:MI:SS') AS STRDT,
+                            TO_CHAR(END_DT,'YYYY-MM-DD HH24:MI:SS') AS ENDDT,
+                            REPLACE(USE_YN,' ','') AS USEYN,
+                            REG_EMAIL AS USEREMAIL,
+                            REG_DT AS REGDT,
+                            ATCH_FILE_ID AS ATCHFILEID,
+                            LANG_CD AS LANGCD,
+                            DAY_OPEN_YN AS DAYOPENYN
+                        FROM TB_10171072
+                        WHERE 1=1
+                         AND USE_YN = 'Y'
+                         AND LANG_CD = #{langCd}
+                            AND sysdate <![CDATA[  >=  ]]>STR_DT
+                            AND sysdate <![CDATA[  <=  ]]> END_DT
+                        ORDER BY REG_DT DESC , END_DT DESC
+                )T
+            )TT
+            WHERE TT.NO BETWEEN 1 AND 3
+    </select>
+
+    <select id="selectFileSn" parameterType="String" resultType="String">
+		SELECT
+			NVL(MAX(FILE_SN),0) AS FILE_SN
+		FROM LETTNFILEDETAIL
+		WHERE ATCH_FILE_ID =  #{atch_file_id}
+ 	</select>
+
+    <select id="getBotSellList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+       SELECT CN_SEL_CODE CNSELCODE, USER_EMAIL USEREMAIL , SEL_AMT - CN_EXCHG_AMT REMPRC , CN_KND_CD CNKNDCD
+          FROM TB_30171044
+            WHERE
+            CN_KND_CD = #{cnKndCd}
+            AND USER_EMAIL IN (#{userEmail})
+         AND  SEL_AMT - CN_EXCHG_AMT - NVL(CNCL_SEL_AMT, 0) <![CDATA[ >  ]]> 0
+         ORDER BY REG_DT DESC
+    </select>
+
+    <select id="getBotBuyList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+       SELECT CN_PHS_CODE CNPHSCODE, REG_EMAIL USEREMAIL , NVL(CSH_PRC, 0) - NVL(EX_BUY_PRC, 0) REMPRC
+        FROM TB_30171043
+            WHERE
+            CN_KND_CD = #{cnKndCd}
+            AND USER_EMAIL IN (#{userEmail})
+        AND IS_BUY_ALL = 'N' ORDER BY REG_DT DESC
+    </select>
+</mapper>
+
+
+
+
+

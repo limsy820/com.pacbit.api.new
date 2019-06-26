@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="extraServiceDAO">
+
+    <resultMap id="extraMap" type="hashmap"/>
+
+    <update id="PR_INSUPT40171020" parameterType="com.bitkrx.api.extraSvc.vo.AutoTradeServiceVO" statementType="CALLABLE">
+		{ call PR_INSUPT40171020(
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{payAmt		,mode=IN,jdbcType=INTEGER},
+			#{userEmail		,mode=IN,jdbcType=INTEGER},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=extraMap})
+		}
+	</update>
+
+    <select id="getAutoTradeService" parameterType="String" resultType="com.bitkrx.api.extraSvc.vo.AutoTradeServiceVO">
+
+        SELECT
+          USER_EMAIL USEREMAIL,
+          REQ_DT REQDT,
+          END_DT ENDDT,
+          CN_KND_CD CNKNDCD,
+          PAY_AMT PAYAMT
+        FROM TB_40171020
+        WHERE USER_EMAIL = #{value}
+        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REQ_DT AND END_DT
+        ORDER BY REQ_DT DESC , CN_KND_CD
+    </select>
+
+</mapper>

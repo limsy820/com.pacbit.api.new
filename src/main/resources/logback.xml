@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+	<property name="LOGS_ABSOLUTE_PATH" value="/home/was/logs" />
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_ABSOLUTE_PATH}/noryapi.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%-4relative [%thread] %-5level %logger{35} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_ABSOLUTE_PATH}/front.%d{yyyy-MM-dd}.log</fileNamePattern>
+        </rollingPolicy>
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+        </layout>
+    </appender>
+
+
+
+    <logger name="org.springframework.samples.mvc" level="error" /> 
+	<logger name="org.springframework.core" level="error" /> 
+	<logger name="org.springframework.beans" level="error" /> 
+	<logger name="org.springframework.context" level="error" /> 
+	<logger name="org.springframework.http" level="error" /> 
+	<logger name="org.springframework.web" level="error" /> 
+	<logger name="org.springframework" level="error" /> 
+		
+	<logger name="org.apache" level="error" /> 
+	<logger name="org.mybatis" level="error" />	
+	     
+   <!--  <logger name="java.sql" level="error" />  -->
+    <logger name="jdbc.sqlonly" level="error" />  
+    <!--<logger name="jdbc.sqltiming" level="debug" />-->
+    <logger name="jdbc.audit" level="error" /> 
+    <logger name="jdbc.resultset" level="error" />
+	--> 
+	<!-- jdbc.sqlonly : SQL문만을 로그로 남기며, PreparedStatement일 경우 관련된 argument 값으로 대체된 SQL문이 보여진다. 
+	jdbc.sqltiming : SQL문과 해당 SQL을 실행시키는데 수행된 시간 정보(milliseconds)를 포함한다. 
+	jdbc.audit : ResultSet을 제외한 모든 JDBC 호출 정보를 로그로 남긴다. 많은 양의 로그가 생성되므로 특별히 JDBC 문제를 추적해야 할 필요가 있는 경우를 제외하고는 사용을 권장하지 않는다. 
+	jdbc.resultset : ResultSet을 포함한 모든 JDBC 호출 정보를 로그로 남기므로 매우 방대한 양의 로그가 생성된다. 
+	-->
+
+    <!-- <root level="debug"> -->
+    <root level="warn">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="FILE" />
+    </root>
+</configuration>

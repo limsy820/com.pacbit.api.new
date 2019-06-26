@@ -1,0 +1,2753 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tradeDAO">
+	
+	<resultMap id="tradeMap" type="hashmap"/>
+	
+	<!-- <update id="INSUPT30171043" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		{ call PR_INSUPT30171043(
+			#{cnPhsCode		,mode=IN,jdbcType=VARCHAR},
+			#{cshPrc		,mode=IN,jdbcType=INTEGER},
+			#{pntPrc		,mode=IN,jdbcType=INTEGER},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{apntPhsYn		,mode=IN,jdbcType=CHAR},
+			#{phsAmt		,mode=IN,jdbcType=INTEGER},
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR})
+		}
+	</update> -->
+
+	<select id="buyMenuView" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.BuyMenuVO">
+	
+		SELECT 
+			NVL(FN_MNY_CHK(#{userEmail}),'0') as price,
+        	NVL(FN_GETPNT(#{userEmail}),'0') as pointPrc,
+        	NVL((SELECT BUYTRANPRC FROM(
+            SELECT ROW_NUMBER() OVER(order by BUYTRANPRC DESC) RN1, BUYCNAMT, BUYTRANPRC FROM(
+                        SELECT
+                                   SUM(CN_REM_AMT) BUYCNAMT,
+                                   CN_PRC BUYTRANPRC
+                           FROM VW_EX_BUY_INFO
+                           WHERE IS_BUY_ALL = 'N'
+                           AND CN_KND_CD =  #{curcyCd}
+                           GROUP BY CN_PRC)
+                      WHERE BUYCNAMT  >   0)
+                      WHERE RN1 = 1), 0) MINPRC
+        FROM DUAL
+        
+	</select>
+	
+	<select id="maxBuyPrice" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.BuyPosPrcVO">
+	
+		SELECT 
+			NVL(FN_MNY_CHK(#{userEmail}),'0') as price,
+			TO_CHAR(FN_CHK_CN_AMT(#{userEmail},#{payCurcyCd}), 'FM99999999990.00000000') AS cnAmt,
+        	NVL(FN_GETPNT(#{userEmail}),'0') as pointPrc,
+        	NVL(
+        		(SELECT SEL_PRC FROM 
+        			(SELECT SEL_PRC 
+        			FROM VW_EX_SEL_INFO 
+        			WHERE IS_SOLD_OUT = 'N' 
+        			AND CN_KND_CD = #{curcyCd}
+        			AND CN_REM_AMT > 0
+        			ORDER BY SEL_PRC ASC) 
+		        WHERE ROWNUM = 1)
+		    , '0') AS minPrc,
+		    NVL(
+		    	(SELECT CN_PRC
+		             FROM (  SELECT CN_PRC
+		                       FROM VW_EX_BUY_INFO
+		                      WHERE IS_BUY_ALL = 'N' AND CN_KND_CD = #{payCurcyCd}
+		                   ORDER BY CN_PRC DESC)
+		            WHERE ROWNUM = 1),
+		          '0') AS maxPrc
+        FROM DUAL
+        
+	</select>
+	
+	<update id="INSUPT30171043" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INS30171043
+				(
+				#{usePrc}/*구매금액*/, 
+				#{usePointPrc}/*포인트금액*/,
+				#{phsPrc}/*코인개당가격*/,
+				#{phsAmt}/*구매개수*/,
+				#{userEmail}/*이메일*/,
+				#{buyCurcyCd},/*구매통화*/
+				#{apntPhsYn},
+				#{regIp},
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} 
+				)
+		}
+	</update>
+	
+	
+	<select id="sellMenuView" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.CmeTradeSellMenuViewResVO">
+	
+		SELECT 
+			TO_CHAR(NVL(FN_CHK_CN_AMT(#{userEmail},#{curcyCd}), 0), 'FM99999999990.00000000') AVASELLAMT,
+        	NVL((SELECT SELLTRANPRC FROM(                 
+            SELECT ROW_NUMBER() OVER(order by SELLTRANPRC ASC) RN2,SELLCNAMT, SELLTRANPRC FROM(
+                            SELECT  
+                                    SUM(CN_REM_AMT) SELLCNAMT,
+                                    SEL_PRC SELLTRANPRC 
+                            FROM VW_EX_SEL_INFO
+                            WHERE IS_SOLD_OUT = 'N'
+                            AND CN_KND_CD = #{curcyCd}
+                            GROUP BY SEL_PRC)
+                        WHERE SELLCNAMT   >  0)
+                 WHERE RN2 = 1), 0) MAXPRC
+        FROM DUAL
+        
+        
+	</select>
+	
+	
+	<select id="recCoinView" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.RecCoinViewVO">
+
+        SELECT
+            NVL((SELECT BUYTRANPRC FROM(
+                SELECT ROW_NUMBER() OVER(order by BUYTRANPRC DESC) RN1, BUYCNAMT, BUYTRANPRC FROM(
+                    SELECT
+                        SUM(CN_REM_AMT) BUYCNAMT,
+                        CN_PRC BUYTRANPRC
+                    FROM VW_EX_BUY_INFO
+                    WHERE IS_BUY_ALL = 'N'
+                          AND CN_KND_CD =  #{rcvCurcyCd}
+                    GROUP BY CN_PRC)
+                WHERE BUYCNAMT  >   0)
+            WHERE RN1 = 1), 0) MAXPRC,
+
+            NVL((SELECT SELLTRANPRC FROM(
+                SELECT ROW_NUMBER() OVER(order by SELLTRANPRC ASC) RN2,SELLCNAMT, SELLTRANPRC FROM(
+                    SELECT
+                        SUM(CN_REM_AMT) SELLCNAMT,
+                        SEL_PRC SELLTRANPRC
+                    FROM VW_EX_SEL_INFO
+                    WHERE IS_SOLD_OUT = 'N'
+                          AND CN_KND_CD = #{rcvCurcyCd}
+                    GROUP BY SEL_PRC)
+                WHERE SELLCNAMT   >  0)
+            WHERE RN2 = 1), 0) MINPRC,
+            TO_CHAR(NVL(FN_CHK_CN_AMT(#{userEmail},#{curcyCd}), 0), 'FM99999999990.00000000') CURCYAMT,
+            TO_CHAR(NVL(FN_CHK_CN_AMT(#{userEmail},#{rcvCurcyCd}), 0), 'FM99999999990.00000000') RCVCURCYAMT
+        FROM DUAL
+        
+	</select>
+	
+	<update id="INSUPT30171044" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INS30171044(
+			#{phsAmt}/*판매개수*/,
+			#{phsPrc}/*SEL_PRC*/,
+			#{userEmail}/*이메일*/,
+			#{sellCurcyCd}/*코인종류*/,
+			#{apntPhsYn}/*지정판매여부*/,
+			#{regIp}/*등록IP*/,
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} 
+			)
+		}
+	</update>
+
+	<select id="tradeHistory" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeResVO">
+
+        SELECT * FROM (
+        SELECT * FROM
+        (
+        /*1. 충전내역*/
+        <if test="mkState == null or mkState == '' or mkStateDefault == mkState">
+            SELECT STT.* FROM (
+            SELECT
+            TO_CHAR(T3.REG_DT, 'YYYYMMDDHH24MISS')||T3.MNY_CRG_CODE KEY01,
+            T3.MNY_CRG_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000196' HISCODE,
+            T3.REG_EMAIL USEREMAIL,
+            'C' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            TO_CHAR (T3.CRG_PRC) TOTPRC,
+            T3.REG_DT REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            T3.PAY_KND_CD PAYKNDCD,
+            NVL(TO_CHAR(T4.DPT_FEE), '0') FEE,
+            '0' TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            T4.CARD_NO ORDERDESC,
+            T4.IN_CRY_CODE CRYCODE,
+            RTRIM (TO_CHAR (NVL(T4.EX_RATE, 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (NVL(T4.IN_AMT, 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM TB_30171020 T3, TB_40171014 T4
+            WHERE 1=1
+            AND T3.REG_EMAIL = #{userEmail}
+            AND T3.TRN_ID = T4.TRN_ID(+)
+            AND PAY_KND_CD IN ('CMMC00000000040','CMMC00000000039','CMMC00000000011','CMMC00000000805')
+            <if test="key01 != null and key01 != '' ">
+                AND T3.REG_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(T3.REG_DT, 'YYYYMMDDHH24MISS')||T3.MNY_CRG_CODE <![CDATA[ < ]]> #{key01}
+            </if>
+            ORDER BY T3.REG_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*2.출금내역*/
+            UNION ALL
+            SELECT
+            TO_CHAR(STT.REGDATE, 'YYYYMMDDHH24MISS')||KEY02 KEY01,
+            STT.* FROM (
+            SELECT
+            T1.WDR_REQ_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000199' HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'W' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            RTRIM (TO_CHAR (NVL(OUT_PRC, 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            CASE WHEN WDR_CMPL_DT IS NULL THEN REG_DT ELSE WDR_CMPL_DT END REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            PAY_MTH_CD PAYKNDCD,
+            TO_CHAR ( (SELECT FEE_PRC
+            FROM TB_20171027
+            WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE))
+            FEE,
+            '0' TRADEAMT,
+            WDR_REQ_CODE ORDERNO, /*출금코드*/
+            CASE WHEN STATUS = 'CMMC00000000426' THEN 'Y' ELSE 'N' END ISCOMP,
+            CARD_NO ORDERDESC, /*상태*/
+            EX_CRY_CODE CRYCODE,
+            RTRIM (TO_CHAR (NVL(EX_RATE, 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (WDR_PRC, 'FM99999999990.99999999'), '.') REQAMT,
+            STATUS STATUS,
+            CASE WHEN STATUS = 'CMMC00000000845' THEN 'F'
+            ELSE FAIL_MSG END FAILMSG
+            FROM TB_20171020 T1
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            <if test = "key01 != null and key01 != '' ">
+                AND DECODE(T1.WDR_CMPL_DT,NULL, T1.REG_DT, T1.WDR_CMPL_DT) <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(DECODE(T1.WDR_CMPL_DT,NULL, T1.REG_DT, T1.WDR_CMPL_DT), 'YYYYMMDDHH24MISS')||T1.WDR_REQ_CODE <![CDATA[ < ]]> #{key01}
+            </if>
+            ORDER BY DECODE(T1.WDR_CMPL_DT,NULL, T1.REG_DT, T1.WDR_CMPL_DT) DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*3. ATM내역*/
+            UNION ALL
+            SELECT STT.* FROM (
+            SELECT
+            TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||CRD_CN_SND_CODE KEY01,
+            CRD_CN_SND_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN 'CMMC00000000199'
+            ELSE 'CMMC00000000202' END HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN 'W'
+            ELSE 'P' END EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL(CRD_CN_SND_AMT, 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            REG_DT REGDATE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL(FEE_AMT, 0), 'FM99999999990'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            ATM_MCH_KEY/*CRD_CN_SND_CODE*/ ORDERNO, /*출금코드*/
+            'Y' ISCOMP,
+            CARD_NO ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') REQAMT,
+            'CMMC00000000426' STATUS,
+            '' FAILMSG
+            FROM TB_50171035
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            <if test="key01 != null and key01 != '' ">
+                AND REG_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||CRD_CN_SND_CODE <![CDATA[ <= ]]> #{key01}
+            </if>
+            ORDER BY REG_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*4. 코인신탁 만기내역 */
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            TO_CHAR(T2.EXPIRE_DT, 'YYYYMMDDHH24MISS')||CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(T1.CN_KND_CD,'') CURCYNM,
+            'CMMC00000000202'  HISCODE,
+            T1.USER_EMAIL USEREMAIL, /*이메일*/
+            'R'  EXFLAG,
+            T1.CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            TO_DATE(T1.REG_DT , 'YYYY/MM/DD') REGDATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(T1.CN_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            T1.WLET_KND_CD ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            (T2.TRUST_STATUS) STATUS,
+            (TO_CHAR(TO_DATE(T2.REQ_DT , 'YYYYMMDD'), 'YYYY/MM/DD') ) FAILMSG
+            FROM TB_30171030 T1, TB_40171031 T2
+            WHERE 1=1
+            AND T1.USER_EMAIL = #{userEmail}
+            AND T2.TRUST_REQ_CODE = T1.WLET_KND_CD
+            AND IN_GUBUN = 'I'
+            <if test = "key01 != null and key01 != '' ">
+                AND T2.EXPIRE_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(T2.EXPIRE_DT, 'YYYYMMDDHH24MISS')||CN_DPT_CODE <![CDATA[ <= ]]> #{key01}
+            </if>
+            ORDER BY T2.EXPIRE_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /* 5.거래제한 금액 내역 */
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            TO_CHAR(T2.UPT_DT, 'YYYYMMDDHH24MISS')||T1.CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            'CMMC00000000201'  HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'L'  EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL(CN_AMT, 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            (T2.UPT_DT ) REGDATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(TR_LIMT_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            TO_CHAR(REG_DT , 'YY/MM/DD') || ' ~ ' ||  TO_CHAR(TO_DATE(TR_LIMT_DT , 'YYYYMMDD') , 'YY/MM/DD') FAILMSG
+            FROM TB_30171030 T1, TB_30171031 T2
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            AND TR_LIMT_EXPIRE_YN = 'N'
+            AND TR_LIMT_AMT IS NOT NULL
+            AND TR_LIMT_DT IS NOT NULL
+            AND T2.CN_DPT_CODE = T1.CN_DPT_CODE
+            <if test="key01 != null and key01 != '' ">
+                AND T2.UPT_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(T2.UPT_DT, 'YYYYMMDDHH24MISS')||T1.CN_DPT_CODE <![CDATA[ <= ]]> #{key01}
+            </if>
+            ORDER BY T2.UPT_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*6.자동거래 신청내역*/
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            REQ_DT || '000001'|| END_DT || '000001' KEY01,
+            END_DT || '000001' KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            'CMMC00000000202'  HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'A'  EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            TO_DATE(REQ_DT , 'YYYY/MM/DD') REGDATE,
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN RTRIM (TO_CHAR (NVL('', ''), 'FM99999999990.99999999'), '.')
+            ELSE RTRIM (TO_CHAR (NVL((SELECT rtrim(to_char(NVL(FN_CUR_PRICE('S',CN_KND_CD),0),'FM99999999990.99999999'),'.')  FROM DUAL) * PAY_AMT,0),'FM99999999990.99999999'),'.') END TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(PAY_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            TO_CHAR(TO_DATE(REQ_DT , 'YYYYMMDD') , 'YY/MM/DD') || ' ~ ' ||  TO_CHAR(TO_DATE(END_DT , 'YYYYMMDD') , 'YY/MM/DD') FAILMSG
+            FROM TB_40171020
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            <if test="key01 != null and key01 != '' ">
+                AND REQ_DT  <![CDATA[ <= ]]> SUBSTR('20181228232506', 1,8)
+                AND REQ_DT || '000001'|| END_DT || '000001' <![CDATA[ <= ]]> #{key01}
+            </if>
+            ORDER BY REQ_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*7.포인트 지급내역*/
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||AST_PNT_CODE KEY01,
+            AST_PNT_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000201' HISCODE,
+            USER_EMAIL USEREMAIL,
+            'O' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC,
+            REG_DT REGDATE,
+            RTRIM (TO_CHAR (NVL(PNT_PRC, 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            NVL(TO_CHAR(''), '0') FEE,
+            '0' TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC,
+            '' CRYCODE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM TB_30171041
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            <if test="key01 != null and key01 != '' ">
+                AND REG_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||AST_PNT_CODE <![CDATA[ < ]]>  #{key01}
+            </if>
+            ORDER BY REG_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*8.송금내역*/
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            TO_CHAR(DECODE(T1.WDR_CMPL_DT, NULL, T1.REG_DT, T1.WDR_CMPL_DT) , 'YYYYMMDDHH24MISS')|| T1.WDR_REQ_CODE KEY01,
+            T1.WDR_REQ_CODE KEY02,
+            FN_CMM_CD(T1.CN_KND_CD, '') CURCYNM,
+            'CMMC00000000200' HISCODE,
+            T1.USER_EMAIL USEREMAIL, /*이메일*/
+            CASE
+            WHEN T1.IN_GUBUN IN ('L1' ,'L2' , 'L3' , 'L4') THEN 'LD'
+            ELSE 'T'
+            END EXFLAG,
+            T1.CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (T1.WDR_REQ_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+            '0' TOTPRC, /*송금액*/
+            CASE
+            WHEN T1.WDR_CMPL_DT IS NULL THEN T1.REG_DT
+            ELSE T1.WDR_CMPL_DT
+            END REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR ( (SELECT T2.FEE_AMT FROM TB_10171067 WHERE CN_KND_CD = T1.CN_KND_CD), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (T1.WDR_REQ_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+            T1.DEAL_NO ORDERNO, /*거래번호*/
+            CASE WHEN T1.STATUS = 'CMMC00000000099' THEN 'Y' ELSE 'N' END ISCOMP,
+            T1.WDR_WLET_ADR ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '0' EXRATE,
+            '0' REQAMT,
+            STATUS STATUS,
+            IN_GUBUN FAILMSG
+            FROM TB_20171023 T1, TB_20171026 T2
+            WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+            AND T1.USER_EMAIL = #{userEmail}
+            <if test="key01 != null and key01 != '' ">
+                AND DECODE(T1.WDR_CMPL_DT, NULL, T1.REG_DT, T1.WDR_CMPL_DT) <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(DECODE(T1.WDR_CMPL_DT, NULL, T1.REG_DT, T1.WDR_CMPL_DT), 'YYYYMMDDHH24MISS')||T1.WDR_REQ_CODE <![CDATA[ < ]]> #{key01}
+            </if>
+            ORDER BY DECODE(T1.WDR_CMPL_DT, NULL, T1.REG_DT, T1.WDR_CMPL_DT) DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /* 9.코인입금내역*/
+            UNION ALL
+            SELECT
+            STT.* FROM (
+            SELECT
+            TO_CHAR(T2.UPT_DT , 'YYYYMMDDHH24MISS')|| T1.CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD, '') CURCYNM,
+            'CMMC00000000201' HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            CASE
+            WHEN IN_GUBUN = 'L' THEN 'LD'
+            WHEN IN_GUBUN = 'X' THEN 'X'
+            WHEN IN_GUBUN = 'E' THEN 'E'
+            WHEN IN_GUBUN = 'Z' THEN 'Z'
+            ELSE 'D'
+            END EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (CN_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+            '0' TOTPRC,
+            T2.UPT_DT REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            '0' FEE,
+            RTRIM (TO_CHAR (CN_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+            DEAL_NO ORDERNO, /*거래번호*/
+            CASE WHEN DPT_KND_CD = 'CMMC00000000014' THEN 'N' ELSE 'Y' END ISCOMP,
+            SND_WLET_ADR ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '0' EXRATE,
+            '0' REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM  TB_30171031 T2, TB_30171030 T1
+            WHERE DPT_KND_CD IN ('CMMC00000000014', 'CMMC00000000283')
+            AND USER_EMAIL = #{userEmail}
+            AND TR_LIMT_DT IS NULL
+            AND T1.CN_DPT_CODE = T2.CN_DPT_CODE
+            <if test="key01 != null and key01 != '' ">
+                AND T2.UPT_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+                AND TO_CHAR(T2.UPT_DT, 'YYYYMMDDHH24MISS')||T1.CN_DPT_CODE <![CDATA[ < ]]> #{key01}
+            </if>
+            ORDER BY T2.UPT_DT DESC
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*10. 구매내역*/
+            UNION ALL
+        </if>
+        SELECT
+        TO_CHAR(REGDATE , 'YYYYMMDDHH24MISS')|| KEY02 KEY01,
+        STT.* FROM (
+        SELECT
+        ORDERNO KEY02,
+        FN_CMM_CD(CURCYCD, '') CURCYNM,
+        'CMMC00000000197' HISCODE,
+        BT.*,
+        CASE
+        WHEN BT.APNTYN = 'Y' THEN FN_CMM_CD (CURCYCD, '') || '구매(지정가)'
+        ELSE FN_CMM_CD (CURCYCD, '') || '구매(시장가)'
+        END ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM (SELECT
+        BUY_USER_EMAIL USEREMAIL,
+        'B' EXFLAG,
+        CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (PHS_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+        TO_CHAR (BUY_SUM_PRC) TOTPRC,
+        BUY_REG_DT REGDATE,
+        TO_CHAR (CN_PRC) TRADEPRC,
+        NVL ( (SELECT EX_APNT_YN FROM TB_20171030_M01 T1 WHERE T1.CN_PHS_CODE = B.CN_PHS_CODE AND ROWNUM = 1), 'Y') APNTYN,
+        '' PAYKNDNM,
+        RTRIM (TO_CHAR (NVL ((SELECT SUM(T1.FEE_AMT) FROM TB_20171030_M01 T1 WHERE T1.CN_PHS_CODE = B.CN_PHS_CODE), '0'), 'FM99999999990.99999999'), '.') FEE,
+        RTRIM (TO_CHAR (CN_EXCHG_AMT, 'FM99999999990.99999999'), '.')
+        TRADEAMT,
+        CN_PHS_CODE ORDERNO,
+        IS_BUY_ALL ISCOMP
+        FROM VW_EX_BUY_INFO B
+        WHERE IS_BUY_ALL = 'N') BT
+        WHERE USEREMAIL = #{userEmail}
+        <if test="key01 != null and key01 != '' ">
+            AND REGDATE <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+            AND TO_CHAR(REGDATE, 'YYYYMMDDHH24MISS') || ORDERNO <![CDATA[ < ]]> #{key01}
+        </if>
+        ORDER BY REGDATE DESC
+        ) STT
+        WHERE ROWNUM <![CDATA[ <= ]]> 10
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND HISCODE = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND CURCYCD =  #{curcyCd}
+        </if>
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        /*11.판매내역*/
+        UNION ALL
+        SELECT
+        TO_CHAR(REGDATE , 'YYYYMMDDHH24MISS')|| KEY02 KEY01,
+        STT.* FROM (
+        SELECT
+        ORDERNO KEY02,
+        FN_CMM_CD(CURCYCD, '') CURCYNM,
+        'CMMC00000000198' HISCODE,
+        ST.*,
+        CASE
+        WHEN ST.APNTYN = 'Y'
+        THEN FN_CMM_CD (CURCYCD, '') || '판매(지정가)'
+        ELSE FN_CMM_CD (CURCYCD, '') || '판매(시장가)'
+        END ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM (SELECT
+        SEL_USER_EMAIL USEREMAIL,
+        'S' EXFLAG,
+        CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (SEL_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+        TO_CHAR (SEL_SUM_PRC) TOTPRC,
+        SEL_REG_DT REGDATE,
+        TO_CHAR (SEL_PRC) TRADEPRC,
+        NVL((SELECT EX_APNT_YN FROM TB_20171030_M01 T1 WHERE T1.CN_SEL_CODE = S.CN_SEL_CODE AND ROWNUM = 1), 'Y') APNTYN,
+        '' PAYKNDNM,
+        RTRIM (TO_CHAR (NVL ((SELECT SUM(T1.FEE_PRC) FROM TB_20171030_M01 T1 WHERE T1.CN_SEL_CODE = S.CN_SEL_CODE), '0'), 'FM99999999990.99999999'), '.') FEE,
+        RTRIM (TO_CHAR (CN_EXCHG_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+        CN_SEL_CODE ORDERNO,
+        IS_SOLD_OUT ISCOMP
+        FROM VW_EX_SEL_INFO S
+        WHERE IS_SOLD_OUT = 'N') ST
+        WHERE USEREMAIL = #{userEmail}
+        <if test="key01 != null and key01 != '' ">
+            AND REGDATE <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14), 'YYYYMMDDHH24MISS')
+            AND TO_CHAR(REGDATE, 'YYYYMMDDHH24MISS') || ORDERNO <![CDATA[ < ]]> #{key01}
+        </if>
+        ORDER BY REGDATE DESC
+        ) STT
+        WHERE ROWNUM <![CDATA[ <= ]]> 10
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND HISCODE = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND CURCYCD =  #{curcyCd}
+        </if>
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        /* 12.체결내역(등록자) */
+        UNION ALL
+        SELECT STT.* FROM(
+        SELECT /*+ INDEX_DESC(T1 IDX_TB_20171030_M01_IX1) */
+        TO_CHAR(T1.REG_DT , 'YYYYMMDDHH24MISS')||'R'|| T1.CN_EXCHG_CODE KEY01,
+        T1.CN_EXCHG_CODE KEY02,
+        (SELECT CMM_NM
+        FROM TB_30171021 T
+        WHERE T.CMM_CD = T1.EX_CN_KND_CD AND ROWNUM <![CDATA[ < ]]> 2 )
+        AS CURCYNM,
+        CASE
+        WHEN T1.EX_FLAG = 'S' THEN 'CMMC00000000198'
+        WHEN T1.EX_FLAG = 'B' THEN 'CMMC00000000197'
+        END AS HISCODE,
+        T1.REG_EMAIL USEREMAIL,
+        T1.EX_FLAG EXFLAG,
+        T1.EX_CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (T1.CN_EXCHG_AMT, 'FM99999999990.99999999'),'.') CNAMT,
+        TO_CHAR (T1.EX_TOT_PRC) TOTPRC,
+        T1.REG_DT REGDATE,
+        TO_CHAR (T1.EX_CN_PRC) TRADEPRC,
+        NVL(T1.EX_APNT_YN,'Y') APNTYN,
+        '' PAYKNDNM,
+        CASE
+        WHEN T1.EX_FLAG = 'S'
+        THEN RTRIM (TO_CHAR (T1.FEE_PRC, 'FM99999999990.99999999'),'.')
+        WHEN T1.EX_FLAG = 'B'
+        THEN RTRIM (TO_CHAR (T1.FEE_AMT, 'FM99999999990.99999999'),'.')
+        END FEE,
+        RTRIM (TO_CHAR (T1.CN_EXCHG_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+        T1.CN_EXCHG_CODE ORDERNO,
+        'Y' ISCOMP,
+        CASE
+        WHEN NVL(T1.EX_APNT_YN,'Y') = 'Y' AND T1.EX_FLAG = 'B'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '구매(지정가)'
+        WHEN NVL(T1.EX_APNT_YN,'Y') = 'Y' AND T1.EX_FLAG = 'S'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '판매(지정가)'
+        WHEN T1.EX_FLAG = 'B'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '구매(시장가)'
+        WHEN T1.EX_FLAG = 'S'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '판매(시장가)'
+        END AS ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM TB_20171030_M01 T1
+        WHERE 1 = 1
+        /* 1. 일시 */
+        AND T1.REG_EMAIL = #{userEmail}
+        <if test="key01 != null and key01 != '' ">AND T1.REG_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14),
+            'YYYYMMDDHH24MISS')
+            AND
+            TO_CHAR(T1.REG_DT, 'YYYYMMDDHH24MISS') || 'R'||T1.CN_EXCHG_CODE <![CDATA[ < ]]> #{key01}
+        </if>
+        AND ROWNUM <![CDATA[ <= ]]> 10
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND DECODE(T1.EX_FLAG, 'S', 'CMMC00000000198','CMMC00000000197') = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND T1.REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 /
+            60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND T1.EX_CN_KND_CD = #{curcyCd}
+        </if>
+        ) STT
+        WHERE 1 = 1
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        /* 13.체결내역(처리자) */
+        UNION ALL
+        SELECT STT.* FROM(
+        SELECT /*+ INDEX_DESC(T1 IDX_TB_20171030_M01_IX1) */
+        TO_CHAR(T1.REG_DT , 'YYYYMMDDHH24MISS')||'O'|| T1.CN_EXCHG_CODE KEY01,
+        T1.CN_EXCHG_CODE KEY02,
+        (SELECT CMM_NM
+        FROM TB_30171021 T
+        WHERE T.CMM_CD = T1.EX_CN_KND_CD AND ROWNUM <![CDATA[ < ]]> 2 )
+        AS CURCYNM,
+        CASE
+        WHEN T1.EX_FLAG = 'S' THEN 'CMMC00000000197'
+        WHEN T1.EX_FLAG = 'B' THEN 'CMMC00000000198'
+        END HISCODE,
+        T1.OPP_EMAIL USEREMAIL,
+        CASE
+        WHEN T1.EX_FLAG = 'S' THEN 'B'
+        WHEN T1.EX_FLAG = 'B' THEN 'S'
+        END EXFLAG,
+        T1.EX_CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (T1.CN_EXCHG_AMT, 'FM99999999990.99999999'),'.') CNAMT,
+        TO_CHAR (T1.EX_TOT_PRC) TOTPRC,
+        T1.REG_DT AS REGDATE,
+        TO_CHAR (T1.EX_CN_PRC) TRADEPRC,
+        'Y' APNTYN,
+        '' PAYKNDNM,
+        CASE
+        WHEN T1.EX_FLAG = 'S'
+        THEN RTRIM (TO_CHAR (T1.FEE_AMT, 'FM99999999990.99999999'),'.')
+        WHEN T1.EX_FLAG = 'B'
+        THEN RTRIM (TO_CHAR (T1.FEE_PRC, 'FM99999999990.99999999'),'.')
+        END FEE,
+        RTRIM (TO_CHAR (T1.CN_EXCHG_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+        T1.CN_EXCHG_CODE ORDERNO,
+        'Y' ISCOMP,
+        CASE
+        WHEN T1.EX_FLAG = 'S'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '구매(지정가)'
+        WHEN T1.EX_FLAG = 'B'
+        THEN FN_CMM_CD (T1.EX_CN_KND_CD, '') || '판매(지정가)'
+        END ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM TB_20171030_M01 T1
+        WHERE 1 = 1
+        /* 1. 일시 */
+        AND T1.OPP_EMAIL = #{userEmail}
+        <if test="key01 != null and key01 != '' ">AND T1.REG_DT <![CDATA[ <= ]]>  TO_DATE(SUBSTR(#{key01},1,14),
+            'YYYYMMDDHH24MISS')
+            AND
+            TO_CHAR(T1.REG_DT, 'YYYYMMDDHH24MISS') ||'O'|| T1.CN_EXCHG_CODE <![CDATA[ < ]]> #{key01}
+        </if>
+        AND ROWNUM <![CDATA[ <= ]]> 10
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND DECODE(T1.EX_FLAG, 'S', 'CMMC00000000197','CMMC00000000198') = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND T1.REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND T1.EX_CN_KND_CD = #{curcyCd}
+        </if>
+        ) STT
+        WHERE 1 = 1
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        ) AA
+        ORDER BY KEY01 DESC
+        ) BB
+        WHERE ROWNUM <![CDATA[ <= ]]> 10
+        <choose>
+            <when test = "tradeType == 'trade' ">
+                AND HISCODE IN ('CMMC00000000197' , 'CMMC00000000198')
+            </when>
+            <when test = "tradeType == 'other' ">
+                AND HISCODE NOT IN ('CMMC00000000197' , 'CMMC00000000198')
+            </when>
+        </choose>
+    </select>
+
+	<select id="tradeHistoryCnt" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="int">
+
+
+        SELECT SUM(CNT) FROM
+        (
+        <if test="mkState == null or mkState == '' or mkStateDefault == mkState">
+            /*1. 충전내역*/
+            SELECT COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(T3.REG_DT, 'YYYYMMDDHH24MISS')||T3.MNY_CRG_CODE KEY01,
+            T3.MNY_CRG_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000196' HISCODE,
+            T3.REG_EMAIL USEREMAIL,
+            'C' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            TO_CHAR (T3.CRG_PRC) TOTPRC,
+            T3.REG_DT REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            T3.PAY_KND_CD PAYKNDCD,
+            NVL(TO_CHAR(T4.DPT_FEE), '0') FEE,
+            '0' TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            T4.CARD_NO ORDERDESC,
+            T4.IN_CRY_CODE CRYCODE,
+            RTRIM (TO_CHAR (NVL(T4.EX_RATE, 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (NVL(T4.IN_AMT, 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM TB_30171020 T3, TB_40171014 T4
+            WHERE 1=1
+            AND T3.REG_EMAIL = #{userEmail}
+            AND T3.TRN_ID = T4.TRN_ID(+)
+            AND PAY_KND_CD IN ('CMMC00000000040','CMMC00000000039','CMMC00000000011','CMMC00000000805')
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*2.출금내역*/
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            T1.WDR_REQ_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000199' HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'W' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            RTRIM (TO_CHAR (NVL(OUT_PRC, 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            CASE WHEN WDR_CMPL_DT IS NULL THEN REG_DT ELSE WDR_CMPL_DT END REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            PAY_MTH_CD PAYKNDCD,
+            TO_CHAR ( (SELECT FEE_PRC
+            FROM TB_20171027
+            WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE))
+            FEE,
+            '0' TRADEAMT,
+            WDR_REQ_CODE ORDERNO, /*출금코드*/
+            CASE WHEN STATUS = 'CMMC00000000426' THEN 'Y' ELSE 'N' END ISCOMP,
+            CARD_NO ORDERDESC, /*상태*/
+            EX_CRY_CODE CRYCODE,
+            RTRIM (TO_CHAR (NVL(EX_RATE, 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (WDR_PRC, 'FM99999999990.99999999'), '.') REQAMT,
+            STATUS STATUS,
+            CASE WHEN STATUS = 'CMMC00000000845' THEN 'F'
+            ELSE FAIL_MSG END FAILMSG
+            FROM TB_20171020 T1
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*3. ATM내역*/
+            UNION ALL
+            SELECT COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||CRD_CN_SND_CODE KEY01,
+            CRD_CN_SND_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN 'CMMC00000000199'
+            ELSE 'CMMC00000000202' END HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN 'W'
+            ELSE 'P' END EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL(CRD_CN_SND_AMT, 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            REG_DT REGDATE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL(FEE_AMT, 0), 'FM99999999990'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            ATM_MCH_KEY ORDERNO, /*출금코드*/
+            'Y' ISCOMP,
+            CARD_NO ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL(USE_PRC, 0), 'FM99999999990.99999999'), '.') REQAMT,
+            'CMMC00000000426' STATUS,
+            '' FAILMSG
+            FROM TB_50171035
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*4. 코인신탁 만기내역 */
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(T2.EXPIRE_DT, 'YYYYMMDDHH24MISS')||CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(T1.CN_KND_CD,'') CURCYNM,
+            'CMMC00000000202'  HISCODE,
+            T1.USER_EMAIL USEREMAIL, /*이메일*/
+            'R'  EXFLAG,
+            T1.CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            TO_DATE(T1.REG_DT , 'YYYY/MM/DD') REGDATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(T1.CN_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            T1.WLET_KND_CD ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            (T2.TRUST_STATUS) STATUS,
+            (TO_CHAR(TO_DATE(T2.REQ_DT , 'YYYYMMDD'), 'YYYY/MM/DD') ) FAILMSG
+            FROM TB_30171030 T1, TB_40171031 T2
+            WHERE 1=1
+            AND T1.USER_EMAIL = #{userEmail}
+            AND T2.TRUST_REQ_CODE = T1.WLET_KND_CD
+            AND IN_GUBUN = 'I'
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /* 5.거래제한 금액 내역 */
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(T2.UPT_DT, 'YYYYMMDDHH24MISS')||T1.CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            'CMMC00000000201'  HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'L'  EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL(CN_AMT, 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            (T2.UPT_DT ) REGDATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(TR_LIMT_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            TO_CHAR(REG_DT , 'YY/MM/DD') || ' ~ ' ||  TO_CHAR(TO_DATE(TR_LIMT_DT , 'YYYYMMDD') , 'YY/MM/DD') FAILMSG
+            FROM TB_30171030 T1, TB_30171031 T2
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            AND TR_LIMT_EXPIRE_YN = 'N'
+            AND TR_LIMT_AMT IS NOT NULL
+            AND TR_LIMT_DT IS NOT NULL
+            AND T2.CN_DPT_CODE = T1.CN_DPT_CODE
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*6.자동거래 신청내역*/
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            REQ_DT || '000001'|| END_DT || '000001' KEY01,
+            END_DT || '000001' KEY02,
+            FN_CMM_CD(CN_KND_CD,'') CURCYNM,
+            'CMMC00000000202'  HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            'A'  EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC, /*출금액*/
+            TO_DATE(REQ_DT , 'YYYY/MM/DD') REGDATE,
+            CASE WHEN CN_KND_CD = 'CMMC00000000204' THEN RTRIM (TO_CHAR (NVL('', ''), 'FM99999999990.99999999'), '.')
+            ELSE RTRIM (TO_CHAR (NVL((SELECT rtrim(to_char(NVL(FN_CUR_PRICE('S',CN_KND_CD),0),'FM99999999990.99999999'),'.')  FROM DUAL) * PAY_AMT,0),'FM99999999990.99999999'),'.') END TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (NVL(PAY_AMT, 0), 'FM99999999990.99999999'), '.') TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '' EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            TO_CHAR(TO_DATE(REQ_DT , 'YYYYMMDD') , 'YY/MM/DD') || ' ~ ' ||  TO_CHAR(TO_DATE(END_DT , 'YYYYMMDD') , 'YY/MM/DD') FAILMSG
+            FROM TB_40171020
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*7.포인트 지급내역*/
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(REG_DT, 'YYYYMMDDHH24MISS')||AST_PNT_CODE KEY01,
+            AST_PNT_CODE KEY02,
+            FN_CMM_CD('CMMC00000000204','') CURCYNM,
+            'CMMC00000000201' HISCODE,
+            USER_EMAIL USEREMAIL,
+            'O' EXFLAG,
+            'CMMC00000000204' CURCYCD,
+            '0' CNAMT,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') TOTPRC,
+            REG_DT REGDATE,
+            RTRIM (TO_CHAR (NVL(PNT_PRC, 0), 'FM99999999990.99999999'), '.') TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            NVL(TO_CHAR(''), '0') FEE,
+            '0' TRADEAMT,
+            '' ORDERNO,
+            'Y' ISCOMP,
+            '' ORDERDESC,
+            '' CRYCODE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') EXRATE,
+            RTRIM (TO_CHAR (NVL('', 0), 'FM99999999990.99999999'), '.') REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM TB_30171041
+            WHERE 1=1
+            AND USER_EMAIL = #{userEmail}
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*8.송금내역*/
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(DECODE(T1.WDR_CMPL_DT, NULL, T1.REG_DT, T1.WDR_CMPL_DT) , 'YYYYMMDDHH24MISS')|| T1.WDR_REQ_CODE KEY01,
+            T1.WDR_REQ_CODE KEY02,
+            FN_CMM_CD(T1.CN_KND_CD, '') CURCYNM,
+            'CMMC00000000200' HISCODE,
+            T1.USER_EMAIL USEREMAIL, /*이메일*/
+            CASE
+            WHEN T1.IN_GUBUN IN ('L1' ,'L2' , 'L3' , 'L4') THEN 'LD'
+            ELSE 'T'
+            END EXFLAG,
+            T1.CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (T1.WDR_REQ_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+            '0' TOTPRC, /*송금액*/
+            CASE
+            WHEN T1.WDR_CMPL_DT IS NULL THEN T1.REG_DT
+            ELSE T1.WDR_CMPL_DT
+            END REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            RTRIM (TO_CHAR ( (SELECT T2.FEE_AMT FROM TB_10171067 WHERE CN_KND_CD = T1.CN_KND_CD), 'FM99999999990.99999999'), '.') FEE,
+            RTRIM (TO_CHAR (T1.WDR_REQ_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+            T1.DEAL_NO ORDERNO, /*거래번호*/
+            CASE WHEN T1.STATUS = 'CMMC00000000099' THEN 'Y' ELSE 'N' END ISCOMP,
+            T1.WDR_WLET_ADR ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '0' EXRATE,
+            '0' REQAMT,
+            STATUS STATUS,
+            IN_GUBUN FAILMSG
+            FROM TB_20171023 T1, TB_20171026 T2
+            WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+            AND T1.USER_EMAIL = #{userEmail}
+            ) STT
+            WHERE 1=1
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /* 9.코인입금내역*/
+            UNION ALL
+            SELECT
+            COUNT(*) CNT FROM (
+            SELECT
+            TO_CHAR(T2.UPT_DT , 'YYYYMMDDHH24MISS')|| T1.CN_DPT_CODE KEY01,
+            T1.CN_DPT_CODE KEY02,
+            FN_CMM_CD(CN_KND_CD, '') CURCYNM,
+            'CMMC00000000201' HISCODE,
+            USER_EMAIL USEREMAIL, /*이메일*/
+            CASE
+            WHEN IN_GUBUN = 'L' THEN 'LD'
+            WHEN IN_GUBUN = 'X' THEN 'X'
+            WHEN IN_GUBUN = 'E' THEN 'E'
+            ELSE 'D'
+            END EXFLAG,
+            CN_KND_CD CURCYCD,
+            RTRIM (TO_CHAR (CN_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+            '0' TOTPRC,
+            T2.UPT_DT REGDATE,
+            '0' TRADEPRC,
+            '' APNTYN,
+            '' PAYKNDCD,
+            '0' FEE,
+            RTRIM (TO_CHAR (CN_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+            DEAL_NO ORDERNO, /*거래번호*/
+            CASE WHEN DPT_KND_CD = 'CMMC00000000014' THEN 'N' ELSE 'Y' END ISCOMP,
+            SND_WLET_ADR ORDERDESC, /*상태*/
+            '' CRYCODE,
+            '0' EXRATE,
+            '0' REQAMT,
+            '' STATUS,
+            '' FAILMSG
+            FROM  TB_30171031 T2, TB_30171030 T1
+            WHERE DPT_KND_CD IN ('CMMC00000000014', 'CMMC00000000283')
+            AND USER_EMAIL = #{userEmail}
+            AND TR_LIMT_DT IS NULL
+            AND T1.CN_DPT_CODE = T2.CN_DPT_CODE
+
+            ) STT
+            WHERE ROWNUM <![CDATA[ <= ]]> 10
+            /* 검색조건 START */
+            <if test="hisCode != null and hisCode != '' ">
+                AND HISCODE = #{hisCode}
+            </if>
+            <if test="endDate != '' and stdDate != '' ">
+                AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+            <if test="curcyCd != null and curcyCd != '' ">
+                AND CURCYCD =  #{curcyCd}
+            </if>
+            <choose>
+                <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                    AND ISCOMP = 'Y'
+                </when>
+                <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                    AND ISCOMP = 'N'
+                </when>
+            </choose>
+            /* 검색조건 END */
+            /*10. 구매내역*/
+            UNION ALL
+        </if>
+        SELECT
+        COUNT(*) CNT FROM (
+        SELECT
+        ORDERNO KEY02,
+        FN_CMM_CD(CURCYCD, '') CURCYNM,
+        'CMMC00000000197' HISCODE,
+        BT.*,
+        CASE
+        WHEN BT.APNTYN = 'Y' THEN FN_CMM_CD (CURCYCD, '') || '구매(지정가)'
+        ELSE FN_CMM_CD (CURCYCD, '') || '구매(시장가)'
+        END ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM (SELECT
+        BUY_USER_EMAIL USEREMAIL,
+        'B' EXFLAG,
+        CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (PHS_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+        TO_CHAR (BUY_SUM_PRC) TOTPRC,
+        BUY_REG_DT REGDATE,
+        TO_CHAR (CN_PRC) TRADEPRC,
+        NVL ( (SELECT EX_APNT_YN FROM TB_20171030_M01 T1 WHERE T1.CN_PHS_CODE = B.CN_PHS_CODE AND ROWNUM = 1), 'Y') APNTYN,
+        '' PAYKNDNM,
+        RTRIM (TO_CHAR (NVL ((SELECT SUM(T1.FEE_AMT) FROM TB_20171030_M01 T1 WHERE T1.CN_PHS_CODE = B.CN_PHS_CODE), '0'), 'FM99999999990.99999999'), '.') FEE,
+        RTRIM (TO_CHAR (CN_EXCHG_AMT, 'FM99999999990.99999999'), '.')
+        TRADEAMT,
+        CN_PHS_CODE ORDERNO,
+        IS_BUY_ALL ISCOMP
+        FROM VW_EX_BUY_INFO B
+        WHERE IS_BUY_ALL = 'N') BT
+        WHERE USEREMAIL = #{userEmail}
+        ) STT
+        WHERE 1=1
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND HISCODE = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND CURCYCD =  #{curcyCd}
+        </if>
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        /*11.판매내역*/
+        UNION ALL
+        SELECT
+        COUNT(*) CNT FROM (
+        SELECT
+        ORDERNO KEY02,
+        FN_CMM_CD(CURCYCD, '') CURCYNM,
+        'CMMC00000000198' HISCODE,
+        ST.*,
+        CASE
+        WHEN ST.APNTYN = 'Y'
+        THEN FN_CMM_CD (CURCYCD, '') || '판매(지정가)'
+        ELSE FN_CMM_CD (CURCYCD, '') || '판매(시장가)'
+        END ORDER_DESC,
+        '' CRYCODE,
+        '0' EXRATE,
+        '0' REQAMT,
+        '' STATUS,
+        '' FAILMSG
+        FROM (SELECT
+        SEL_USER_EMAIL USEREMAIL,
+        'S' EXFLAG,
+        CN_KND_CD CURCYCD,
+        RTRIM (TO_CHAR (SEL_AMT, 'FM99999999990.99999999'), '.') CNAMT,
+        TO_CHAR (SEL_SUM_PRC) TOTPRC,
+        SEL_REG_DT REGDATE,
+        TO_CHAR (SEL_PRC) TRADEPRC,
+        NVL((SELECT EX_APNT_YN FROM TB_20171030_M01 T1 WHERE T1.CN_SEL_CODE = S.CN_SEL_CODE AND ROWNUM = 1), 'Y') APNTYN,
+        '' PAYKNDNM,
+        RTRIM (TO_CHAR (NVL ((SELECT SUM(T1.FEE_PRC) FROM TB_20171030_M01 T1 WHERE T1.CN_SEL_CODE = S.CN_SEL_CODE), '0'), 'FM99999999990.99999999'), '.') FEE,
+        RTRIM (TO_CHAR (CN_EXCHG_AMT, 'FM99999999990.99999999'), '.') TRADEAMT,
+        CN_SEL_CODE ORDERNO,
+        IS_SOLD_OUT ISCOMP
+        FROM VW_EX_SEL_INFO S
+        WHERE IS_SOLD_OUT = 'N') ST
+        WHERE USEREMAIL = #{userEmail}
+        ) STT
+        WHERE 1=1
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND HISCODE = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND REGDATE BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND CURCYCD =  #{curcyCd}
+        </if>
+        <choose>
+            <when test="orderState != null and orderState == 'CMMC00000000213' ">
+                AND ISCOMP = 'Y'
+            </when>
+            <when test="orderState != null and orderState == 'CMMC00000000214' ">
+                AND ISCOMP = 'N'
+            </when>
+        </choose>
+        /* 검색조건 END */
+        /* 12.체결내역(등록자) */
+        UNION ALL
+        SELECT
+        COUNT(*) CNT
+        FROM TB_20171030_M01 T1
+        WHERE     1 = 1
+        /* 1. 일시 */
+        AND T1.REG_EMAIL = #{userEmail}
+
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND DECODE(T1.EX_FLAG, 'S', 'CMMC00000000198','CMMC00000000197') = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND T1.REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND T1.EX_CN_KND_CD =  #{curcyCd}
+        </if>
+        /* 검색조건 END */
+        /* 13.체결내역(처리자) */
+        UNION ALL
+        SELECT COUNT(*) CNT
+        FROM TB_20171030_M01 T1
+        WHERE     1 = 1
+        /* 1. 일시 */
+        AND T1.OPP_EMAIL = #{userEmail}
+        /* 검색조건 START */
+        <if test="hisCode != null and hisCode != '' ">
+            AND DECODE(T1.EX_FLAG, 'S', 'CMMC00000000197','CMMC00000000198') = #{hisCode}
+        </if>
+        <if test="endDate != '' and stdDate != '' ">
+            AND T1.REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+        </if>
+        <if test="curcyCd != null and curcyCd != '' ">
+            AND T1.EX_CN_KND_CD =  #{curcyCd}
+        </if>
+        /* 검색조건 END */
+        ) AA
+	</select>
+	
+	
+	<select id="beforeBuyList" parameterType="com.bitkrx.api.main.vo.CmeCoinPriceChartReqVO" 
+		resultType="com.bitkrx.api.main.vo.CmeCoinBeforeBuyListResVO">
+		SELECT T.* FROM
+				(
+				SELECT 
+				        SUM(BUYCNAMT) OVER(ORDER BY BUYTRANPRC DESC) TOTCNAMT,
+				        BUYCNAMT, 
+				        BUYTRANPRC FROM(
+				            SELECT 
+				                    SUM(CN_REM_AMT) BUYCNAMT,
+				                    CN_PRC BUYTRANPRC         
+				            FROM VW_EX_BUY_INFO
+				            WHERE IS_BUY_ALL = 'N'
+				            AND CN_KND_CD = #{curcyCd}
+				            GROUP BY CN_PRC)
+				   WHERE BUYCNAMT <![CDATA[ >  ]]> 0
+				ORDER BY BUYTRANPRC DESC) T
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+
+   </select>
+   
+   <select id="beforeSellList" parameterType="com.bitkrx.api.main.vo.CmeCoinPriceChartReqVO" 
+		resultType="com.bitkrx.api.main.vo.CmeBeforeSellListResVO">
+		SELECT T.* FROM
+				(
+				SELECT 
+			         SUM(CNAMT) OVER(ORDER BY SELLTRANPRC) TOTCNAMT,
+			         CNAMT,
+			         SELLTRANPRC
+			    FROM (  SELECT SUM (CN_REM_AMT) CNAMT, SEL_PRC SELLTRANPRC
+			              FROM VW_EX_SEL_INFO
+			             WHERE IS_SOLD_OUT = 'N' AND CN_KND_CD = #{curcyCd}
+			          GROUP BY SEL_PRC)
+			   WHERE CNAMT > 0
+			   ORDER BY SELLTRANPRC) T
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+
+   </select>
+   
+   <select id="beforeList" parameterType="com.bitkrx.api.main.vo.CmeCoinPriceChartReqVO" 
+		resultType="com.bitkrx.api.main.vo.beforeListVO">
+   		
+		
+		SELECT
+            CN_KND_CD CNKNDCD,
+		    BUYCNAMT,
+		    BUYTRANPRC,
+		    SELLCNAMT,
+		    SELLTRANPRC
+		FROM TB_SEL_BUY_LIST
+		WHERE
+            1 = 1
+            <if test="curcyCd != '' ">
+                AND CN_KND_CD = #{curcyCd}
+            </if>
+       ORDER BY SEQ
+         
+         
+	</select>
+	
+	<select id="beforeSellTradingList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.BeforeTradeVO">
+		SELECT T.* FROM
+			(
+			SELECT  
+			    CN_SEL_CODE ORDERNO,
+			    SEL_REG_DT TRADETIME,
+			    SEL_AMT CNAMT,
+			    SEL_PRC SVCTRANPRC,
+			    SEL_SUM_PRC ORDERPRC
+			FROM VW_EX_SEL_INFO) T
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+	</select>
+	
+	<select id="beforeBuyTradingList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+		resultType="com.bitkrx.api.trade.vo.BeforeTradeVO">
+		SELECT T.* FROM
+		(
+			SELECT  
+			    CN_PHS_CODE ORDERNO,
+			    BUY_REG_DT TRADETIME,
+			    PHS_AMT CNAMT,
+			    CN_PRC SVCTRANPRC,
+			    BUY_SUM_PRC ORDERPRC
+			FROM VW_EX_BUY_INFO) T
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+	</select>
+	
+	<select id="orderList" parameterType="com.bitkrx.api.main.vo.CmeCoinPriceChartReqVO" 
+		resultType="com.bitkrx.api.main.vo.CmeOrderListResVO">
+		SELECT /*+ INDEX_DESC(T1 IDX_TB_20171030_M01_PK) */
+            T1.CN_EXCHG_CODE,
+            TO_CHAR(T1.REG_DT,'YYYY/MM/DD HH24:MI:SS') TRADETIME,
+            T1.EX_CN_PRC COINPRC,
+            T1.CN_EXCHG_AMT CNAMT,
+            T1.EX_TOT_PRC TRADEPRC,
+            CASE
+                WHEN T1.EX_FLAG = 'S' THEN 'CMMC00000000198'
+                ELSE 'CMMC00000000197'
+            END ORDERCD
+            FROM TB_20171030_M01 T1
+        WHERE     1 = 1
+        AND EX_CN_KND_CD = #{curcyCd}
+        AND ROWNUM <![CDATA[<=]]> #{listSize}
+        ORDER BY T1.REG_DT DESC
+	</select>
+	
+	<select id="realTimeCoinPrice" parameterType="com.bitkrx.api.main.vo.CmeRealTimeCoinPriceReqVO" 
+		resultType="com.bitkrx.api.main.vo.CmeRealTimeCoinPriceResVO">
+		SELECT 
+		    T.CMM_CD CURCYCD
+		    ,rtrim(to_char(NVL(FN_CUR_PRICE('S',T.CMM_CD),0),'FM99999999990.99999999'),'.') COINPRC
+		    ,rtrim(to_char(NVL(FN_AVA_PRICE(T.CMM_CD, 24), 0),'FM99999999990.99999999'),'.') CHGPRC 
+		    ,rtrim(to_char(NVL(FN_AVA_PRICE_PER(T.CMM_CD, 24), 0),'FM99999999990.99999999'),'.') VOLUME
+		    ,rtrim(to_char(NVL(FN_PRICE_SUM(T.CMM_CD, 24),0),'FM99999999990.99999999'),'.') SVCTRANPRC
+		    ,rtrim(to_char(NVL(FN_AMT_SUM(T.CMM_CD, 24),0),'FM99999999990.99999999'),'.') SVCTRANAMT
+		    ,(SELECT CMM_NM FROM TB_30171021 WHERE CMM_CD = T.CMM_CD) COINNM
+		FROM(
+		    SELECT * FROM TB_30171021 
+		    WHERE CMM_UPPER_CD = 'CMMP00000000043' 
+		    AND CMM_CD NOT IN ('CMMC00000000204','CMMC00000000248')
+		    AND USE_YN = 'Y') T 
+		ORDER BY CURCYCD
+		    
+	</select>
+	
+	<select id="notConList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO"  resultType="com.bitkrx.api.trade.vo.NotConListVO">
+		SELECT
+          TT.*
+            FROM(
+                   SELECT FN_CMM_CD(CNKNDCD,'') AS COINNM, T.* FROM(
+                SELECT  
+                        CN_KND_CD CNKNDCD,
+                        SEL_USER_EMAIL USEREMAIL,
+                        CN_SEL_CODE ORDERNO, 
+                        'CMMC00000000198' ORDERCD, 
+                        SEL_REG_DT ORDERTM, 
+                        TRUNC(((SEL_SUM_PRC)/ SEL_PRC),8) ORDERAMT, 
+                        CN_EXCHG_AMT TRADEAMT,
+                        CASE
+                            WHEN CN_EXCHG_AMT > 0 AND #{mkState} = 'KRW' THEN TRUNC(EX_TOT_PRC / CN_EXCHG_AMT)
+                            WHEN CN_EXCHG_AMT > 0 THEN TRUNC(EX_TOT_PRC / CN_EXCHG_AMT, 8)
+                            ELSE 0
+                        END AVRTRADEPRC,
+                        SEL_PRC ORDERPRC, 
+                        CASE 
+                            WHEN 0  <![CDATA[ < ]]>  CN_EXCHG_AMT THEN 'Y'
+                            ELSE 'N'
+                        END AS BUYALLYN
+                        from VW_EX_SEL_INFO WHERE IS_SOLD_OUT ='N'
+                        
+                UNION ALL
+                
+                SELECT  
+                        CN_KND_CD CNKNDCD,
+                        BUY_USER_EMAIL USEREMAIL,
+                        CN_PHS_CODE ORDERNO,
+                        'CMMC00000000197' ORDERCD, 
+                        BUY_REG_DT ORDERTM,
+                        TRUNC(((BUY_SUM_PRC)/ CN_PRC),8) ORDERAMT,
+                        CN_EXCHG_AMT TRADEAMT,
+                        CASE
+                            WHEN CN_EXCHG_AMT > 0 AND #{mkState} = 'KRW' THEN TRUNC(EX_BUY_PRC / CN_EXCHG_AMT)
+                            WHEN CN_EXCHG_AMT > 0 THEN TRUNC(EX_BUY_PRC / CN_EXCHG_AMT, 8)
+                            ELSE 0
+                        END AVRTRADEPRC,
+                        CN_PRC ORDERPRC,
+                        CASE 
+                            WHEN 0   <![CDATA[ < ]]>   CN_EXCHG_AMT THEN 'Y'
+                            ELSE 'N' 
+                        END AS BUYALLYN
+                                   
+                        FROM VW_EX_BUY_INFO WHERE IS_BUY_ALL ='N') T
+            WHERE 
+                USEREMAIL = #{userEmail}
+            <if test="curcyCd != '' ">
+            AND
+                CNKNDCD = #{curcyCd}
+            </if>
+            ORDER BY ORDERTM DESC, ORDERNO DESC) TT
+		WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+         
+	</select>
+	<select id="waitBuyList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" 	resultType="com.bitkrx.api.trade.vo.WaitTradeListVO">
+		SELECT 
+			*
+		 FROM(
+            SELECT 
+			    SUM(TRADEAMT) OVER(ORDER BY TRADEPRC DESC) TOTTRADEAMT,
+			    TRADEAMT,
+			    TRADEPRC
+			FROM(
+			        SELECT 
+			                SUM(CN_REM_AMT) TRADEAMT,
+			                CN_PRC TRADEPRC         
+			        FROM VW_EX_BUY_INFO
+			        WHERE IS_BUY_ALL = 'N'
+			        AND CN_KND_CD = #{curcyCd}
+			        GROUP BY CN_PRC)
+			   WHERE TRADEAMT   >   0
+			ORDER BY TRADEPRC DESC)
+         WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+
+   </select>
+   
+   <select id="waitSellList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="com.bitkrx.api.trade.vo.WaitTradeListVO">
+			SELECT 
+				*
+			FROM(
+			SELECT 
+			    SUM(TRADEAMT) OVER(ORDER BY TRADEPRC) TOTTRADEAMT,
+			    TRADEAMT,
+			    TRADEPRC
+			FROM(
+			        SELECT 
+			                SUM(CN_REM_AMT) TRADEAMT,
+			                SEL_PRC TRADEPRC         
+			        FROM VW_EX_SEL_INFO
+			        WHERE IS_SOLD_OUT = 'N'
+			        AND CN_KND_CD = #{curcyCd}
+			        GROUP BY SEL_PRC)
+			   WHERE TRADEAMT   >   0
+			ORDER BY TRADEPRC)
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+
+   </select>
+   
+   <select id="compTradeList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="com.bitkrx.api.trade.vo.CompTradeListVO">
+   		 SELECT T1.*
+              FROM (SELECT /*+ INDEX_DESC(TB_20171030_M01 IDX_TB_20171030_M01_IX1) */
+					    TO_CHAR(REG_DT,'YYYY/MM/DD HH24:MI:SS') TRADETM,
+                        EX_CN_PRC TRADEPRC,
+                        CN_EXCHG_AMT TRADEAMT,
+                        EX_TOT_PRC TOTTRADEPRC,
+                        CASE
+                            WHEN EX_FLAG = 'S' THEN 'CMMC00000000198'
+                            ELSE 'CMMC00000000197'
+                        END ORDERCD
+					FROM 
+					    TB_20171030_M01
+          			WHERE
+                        EX_CN_KND_CD = #{curcyCd}
+          ) T1
+		 WHERE ROWNUM <![CDATA[<=]]> #{listSize}
+   </select>
+   
+	<select id="selectTradeList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="com.bitkrx.api.trade.vo.TradeListVO">
+
+        SELECT /*+ INDEX_DESC(T1 IDX_TB_20171030_M02_IX1) */
+            T1.CN_EXCHG_CODE,
+            CASE
+            WHEN SB_GUBUN = 'S' THEN 'CMMC00000000198'
+            WHEN SB_GUBUN = 'B' THEN 'CMMC00000000197'
+            END AS ORDERCD,
+            T1.REG_DT AS CONTM,
+            T1.CN_EXCHG_AMT CONAMT,
+            T1.EX_CN_PRC AVECONPRC,
+            T1.EX_TOT_PRC CONPRC,
+            NVL(RTRIM(TO_CHAR(T1.FEE,'FM99999999990.99999999'),'.') , 0) AS FEE,
+            EX_CN_KND_CD CNKNDCD
+        FROM TB_20171030_M02 T1
+        WHERE 1=1
+        /* 1. 일시 */
+        AND T1.USER_EMAIL = #{userEmail}
+        <if test="curcyCd != '' ">
+            AND T1.EX_CN_KND_CD = #{curcyCd}
+        </if>
+        AND ROWNUM  <![CDATA[ <= ]]> 10
+			
+
+	</select>
+	
+	<!-- 구매취소 -->
+	<update id="PR_DEL30171043" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_DEL30171043(
+				#{orderNo}/*주문번호*/,
+				#{userEmail}/*이메일*/,
+				#{regIp}/*등록IP*/,
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<!-- 판매취소 -->
+	<update id="PR_DEL30171044" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_DEL30171044(
+				#{orderNo}/*주문번호*/,
+				#{userEmail}/*이메일*/,
+				#{regIp}/*등록IP*/,
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<!-- 구매부분취소 -->
+	<update id="PR_CNCL20171043" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_CNCL20171043(
+				#{orderNo}/*주문번호*/,
+				#{remPrc}/*남은취소금액*/,
+				#{userEmail}/*이메일*/,
+				#{regIp}/*등록IP*/,
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<select id="getRemPrc" parameterType="String" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		SELECT 
+		    NVL(CSH_PRC, 0) - NVL(EX_BUY_PRC, 0) REMPRC,
+		    CN_KND_CD CURCYCD 
+		FROM TB_30171043
+		WHERE CN_PHS_CODE = #{orderNo}
+	</select>
+					
+	<!-- 판매부분취소 -->
+	<update id="PR_CNCL20171044" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_CNCL20171044(
+				#{orderNo}/*주문번호*/,
+				#{remAmt}/*남은취소수량*/,
+				#{userEmail}/*이메일*/,
+				#{regIp}/*등록IP*/,
+				#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<select id="getRemAmt" parameterType="String" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		SELECT 
+		    SEL_AMT - CN_EXCHG_AMT REMAMT,
+		    CN_KND_CD CURCYCD
+		FROM TB_30171044
+		WHERE CN_SEL_CODE = #{orderNo}
+	</select>
+	
+	<select id="getMarketPrice" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" 
+					resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		SELECT 
+			FN_BUY_CN_AMT(#{usePrc}, FN_CUR_PRICE('B', #{buyCurcyCd})) as phsAmt, 
+			FN_CUR_PRICE('B', #{buyCurcyCd}) as phsPrc
+		FROM DUAL
+	</select>
+	<select id="selectOrderBuy" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		SELECT 
+			CN_PHS_CODE AS ORDERNO,
+			TO_CHAR(CN_REM_AMT, 'FM99999999990.00000000') REMAMT,
+			CN_PRC CNPRC,
+			CN_KND_CD CURCYCD,
+			CASE WHEN CN_EXCHG_AMT > 0 THEN 'Y'
+			ELSE 'N' END ISTRADE,
+			BUY_SUM_PRC - EX_BUY_PRC REMPRC,
+			BUY_SUM_PRC TOTPRC,
+			(SELECT CNCL_BUY_PRC FROM TB_30171043 WHERE CN_PHS_CODE = T1.CN_PHS_CODE) CNCL
+		FROM VW_EX_BUY_INFO T1
+		WHERE CN_PHS_CODE = #{orderNo}
+	</select>
+	
+
+	<select id="selectOrderSel" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+		SELECT 
+			CN_SEL_CODE AS ORDERNO,
+			SEL_PRC CNPRC,
+			CN_KND_CD CURCYCD,
+			CASE WHEN CN_EXCHG_AMT > 0 THEN 'Y'
+			ELSE 'N' END ISTRADE,
+			TO_CHAR(CN_REM_AMT, 'FM99999999990.00000000') REMAMT,
+			(SELECT CNCL_SEL_AMT FROM TB_30171044 WHERE CN_SEL_CODE = T1.CN_SEL_CODE) CNCL
+		FROM VW_EX_SEL_INFO T1
+		WHERE CN_SEL_CODE = #{orderNo}
+	</select>
+	
+	<select id="selectDate" parameterType="String" resultType="String">
+		SELECT TO_CHAR(SYSDATE,'MM/DD HH24:mi') FROM DUAL
+	</select>
+	
+	<select id="getCnPrice" parameterType="String" resultType="String">
+		SELECT NVL(FN_CUR_PRICE('', #{value}), '0') FROM DUAL
+	</select>
+	
+	<select id="getExList" parameterType="com.bitkrx.api.trade.vo.OrderResVO" 
+									resultType="com.bitkrx.api.trade.vo.OrderResVO">
+		SELECT
+		    REG_EMAIL USEREMAIL,
+		    OPP_EMAIL OPPEMAIL,
+		    EX_CN_PRC CNPRC,
+		    CN_EXCHG_AMT CNAMT,
+		    EX_TOT_PRC TOTPRC,
+		    (SELECT SEL_FEE_PRC FROM VW_FEE_INFO
+          		WHERE CN_EXCHG_CODE = T1.CN_EXCHG_CODE) FEE
+		FROM TB_20171030 T1
+		<choose>
+			<when test="cnPhsCode != null and cnPhsCode != '' ">
+				WHERE CN_PHS_CODE= #{cnPhsCode}
+			</when>
+			<when test="cnSelCode != null and cnSelCode != '' ">
+				WHERE CN_SEL_CODE= #{cnSelCode}
+			</when>
+		</choose>
+	</select>
+	
+	<update id="PR_INSUPT20171080" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INSUPT20171080(
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+		    #{userEmail		,mode=IN,jdbcType=VARCHAR},
+		    #{sn		    ,mode=IN,jdbcType=VARCHAR},    
+		    #{udFlag		,mode=IN,jdbcType=VARCHAR},
+		    #{prc       	,mode=IN,jdbcType=VARCHAR},
+		    #{prcPer        ,mode=IN,jdbcType=VARCHAR},
+		    #{rtPlsPrc    	,mode=IN,jdbcType=VARCHAR},    
+		    #{rtMnsPrc      ,mode=IN,jdbcType=VARCHAR},
+		    #{amt       	,mode=IN,jdbcType=VARCHAR},
+		    #{mkState       ,mode=IN,jdbcType=VARCHAR},
+		    #{regIp       	,mode=IN,jdbcType=VARCHAR},
+		    #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<update id="PR_INSUPT20171090" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INSUPT20171090(
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+		    #{userEmail		,mode=IN,jdbcType=VARCHAR},
+		    #{sn		    ,mode=IN,jdbcType=VARCHAR},    
+		    #{udFlag		,mode=IN,jdbcType=VARCHAR},
+		    #{prc       	,mode=IN,jdbcType=VARCHAR},
+		    #{prcPer        ,mode=IN,jdbcType=VARCHAR},
+		    #{rtPlsPrc    	,mode=IN,jdbcType=VARCHAR},    
+		    #{rtMnsPrc      ,mode=IN,jdbcType=VARCHAR},
+		    #{amt       	,mode=IN,jdbcType=VARCHAR},
+		    #{mkState       ,mode=IN,jdbcType=VARCHAR},
+		    #{regIp       	,mode=IN,jdbcType=VARCHAR},
+		    #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap} )
+		}
+	</update>
+	
+	<select id="getAutoBuy" parameterType="com.bitkrx.api.trade.vo.AutoTradeVO" 
+				resultType="com.bitkrx.api.trade.vo.AutoTradeVO">
+			SELECT  
+			    USER_EMAIL USEREMAIL,
+			    CN_KND_CD CNKNDCD,
+			    SN,
+			    UD_FLAG UDFLAG,
+			    PRC,
+			    PRC_PER PRCPER,
+			    RT_PLS_PRC RTPLSPRC,
+			    RT_MNS_PRC RTMNSPRC,
+			    AMT,
+                MK_CN_KND_CD MKSTATE
+			FROM TB_20171080
+			WHERE USER_EMAIL = #{userEmail}
+			<if test="cnKndCd != '' or cnKndCd != '' "> 
+			AND CN_KND_CD = #{cnKndCd}
+			</if>
+			<if test="udFlag != '' or udFlag != '' "> 
+			AND UD_FLAG = #{udFlag}
+			</if>
+            <if test="mkState != '' or mkState != '' ">
+            AND MK_CN_KND_CD = #{mkState}
+            </if>
+			ORDER BY SN
+	</select>
+	
+	
+	<select id="getAutoSell" parameterType="com.bitkrx.api.trade.vo.AutoTradeVO" 
+				resultType="com.bitkrx.api.trade.vo.AutoTradeVO">
+			SELECT  
+			    USER_EMAIL USEREMAIL,
+			    CN_KND_CD CNKNDCD,
+			    SN,
+			    UD_FLAG UDFLAG,
+			    PRC,
+			    PRC_PER PRCPER,
+			    RT_PLS_PRC RTPLSPRC,
+			    RT_MNS_PRC RTMNSPRC,
+			    AMT,
+                MK_CN_KND_CD MKSTATE
+			FROM TB_20171090
+			WHERE USER_EMAIL = #{userEmail}
+			<if test="cnKndCd != '' or cnKndCd != '' "> 
+			AND CN_KND_CD = #{cnKndCd}
+			</if>
+			<if test="udFlag != '' or udFlag != '' "> 
+			AND UD_FLAG = #{udFlag}
+			</if>
+            <if test="mkState != '' or mkState != '' ">
+            AND MK_CN_KND_CD = #{mkState}
+            </if>
+			ORDER BY SN
+	</select>
+	
+	<delete id="delAutoBuy" parameterType="com.bitkrx.api.trade.vo.AutoTradeVO">
+			DELETE
+			FROM
+				TB_20171080
+			WHERE
+			USER_EMAIL = #{userEmail}	
+			<if test="cnKndCd != '' or cnKndCd != '' "> 
+			AND CN_KND_CD = #{cnKndCd}
+			</if>
+			<if test="udFlag != '' or udFlag != '' "> 
+			AND UD_FLAG = #{udFlag}
+			</if>
+            <if test="mkState != '' or mkState != '' ">
+            AND MK_CN_KND_CD = #{mkState}
+            </if>
+	</delete>
+	
+	
+	<delete id="delAutoSell" parameterType="com.bitkrx.api.trade.vo.AutoTradeVO">
+			DELETE
+			FROM
+				TB_20171090
+			WHERE
+			USER_EMAIL = #{userEmail}
+			<if test="cnKndCd != '' or cnKndCd != '' "> 
+			AND CN_KND_CD = #{cnKndCd}
+			</if>
+			<if test="udFlag != '' or udFlag != '' "> 
+			AND UD_FLAG = #{udFlag}
+			</if>
+            <if test="mkState != '' or mkState != '' ">
+                AND MK_CN_KND_CD = #{mkState}
+            </if>
+    </delete>
+	
+	<insert id="insAutoCoinTrade" parameterType="com.bitkrx.api.trade.vo.AutoCoinTradeVO">
+			INSERT INTO TB_20171070 
+			(
+			    USER_EMAIL, SN, USE_YN,
+			    SEL_CN_KND_CD, SEL_SET_RATE, SEL_SET_PRC,
+			    SEL_AMT, CHG_CN_KND_CD, CHG_SET_RATE,
+			    CHG_SET_PRC, CHG_HOPE_AMT, ALRAM_YN,
+			    REG_EMAIL, REG_DT, UPT_EMAIL,
+			    UPT_DT, REG_IP, UPT_IP,
+			    SEL_CN_PRC, CHG_CN_PRC
+			)
+			VALUES
+			(
+			    #{userEmail}, #{sn}, 'Y',
+			    #{selCnKndCd}, #{selSetRate}, #{selSetPrc},
+			    #{selAmt}, #{chgCnKndCd}, #{chgSetRate},
+			    #{chgSetPrc}, #{chgHopeAmt}, 'Y',
+			    #{userEmail}, SYSDATE, #{userEmail},
+			    SYSDATE, #{regIp}, #{regIp},
+			    #{selCnPrc}, #{chgCnPrc}
+			)
+	</insert>
+	
+	
+	<delete id="delAutoCoinTrade" parameterType="com.bitkrx.api.trade.vo.AutoCoinTradeVO">
+			DELETE TB_20171070
+			WHERE USER_EMAIL = #{userEmail}
+	</delete>
+	
+	<select id="getAutoCoinTrade" parameterType="com.bitkrx.api.trade.vo.AutoCoinTradeVO" resultType="com.bitkrx.api.trade.vo.AutoCoinTradeResVO">
+			SELECT 
+                USER_EMAIL USEREMAIL,
+                SEL_CN_KND_CD SELCNKNDCD,
+                SEL_SET_RATE SELSETRATE, 
+                SEL_SET_PRC SELSETPRC,
+                SEL_AMT SELAMT, 
+                CHG_CN_KND_CD CHGCNKNDCD, 
+                CHG_SET_RATE CHGSETRATE,
+                CHG_SET_PRC CHGSETPRC, 
+                CHG_HOPE_AMT CHGHOPEAMT,
+                TO_CHAR(REG_DT, 'YYYY/MM/DD HH24:MI:SS') REGDT,
+                SEL_CN_PRC SELCNPRC, 
+                CHG_CN_PRC CHGCNPRC
+			FROM TB_20171070
+			WHERE USER_EMAIL = #{userEmail}
+	</select>
+	
+	<select id="getCoinList" resultType="com.bitkrx.api.trade.vo.CoinListVO">
+	
+		SELECT 
+			CMM_CD CURCYCD, 
+			CMM_NM CURCYNM
+		FROM 
+			TB_30171021 
+		WHERE 
+			CMM_UPPER_CD = 'CMMP00000000043' 
+		AND 
+			USE_YN = 'Y'
+        ORDER BY
+              CMM_SN
+	</select>
+
+    <update id="orderMQ" parameterType="hashmap" statementType="CALLABLE">
+
+        { call PR_INS10171046(
+			#{userEmail}/*이메일*/,
+			#{sellBuyCd}/*구매판매구분(B:구매,S:판매) */,
+			#{curcyCd}/*코인종류*/,
+			#{amount}/*사용금액(수량)*/,
+			#{regIp}/*지정판매여부*/,
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=tradeMap}
+			)
+		}
+
+    </update>
+
+    <select id="getMaxMinAmt" parameterType="com.bitkrx.api.trade.vo.CoinMinMaxAmtVO" resultType="com.bitkrx.api.trade.vo.CoinMinMaxAmtVO">
+
+        SELECT
+            NVL(FN_MNY_CHK( #{userEmail} ),'0') PRICE,
+            TO_CHAR(FN_CHK_CN_AMT( #{userEmail} , #{payCuycyCd } ), 'FM99999999990.00000000') PAYCNAMT,
+            (SELECT BUYTRANPRC FROM TB_SEL_BUY_LIST WHERE SEQ = 1 AND CN_KND_CD = #{payCuycyCd } ) PAYMAXPRC,
+            (SELECT SELLTRANPRC FROM TB_SEL_BUY_LIST WHERE SEQ = 1 AND CN_KND_CD = #{payCuycyCd } ) PAYMINPRC,
+            (SELECT BUYTRANPRC FROM TB_SEL_BUY_LIST WHERE SEQ = 1 AND CN_KND_CD = #{buyCuycyCd } ) BUYMAXPRC,
+            (SELECT SELLTRANPRC FROM TB_SEL_BUY_LIST WHERE SEQ = 1 AND CN_KND_CD = #{buyCuycyCd } ) BUYMINPRC
+        FROM DUAL
+
+    </select>
+
+
+    <select id="getPlusList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="com.bitkrx.api.trade.vo.TradePlusVO">
+
+
+        WITH COIN_LST AS (
+                 SELECT CMM_CD, CMM_NM, CMM_SN,
+                      FN_CUR_PRICE('' , T1.CMM_CD)
+                         CNPRC
+                 FROM TB_30171021 T1 WHERE CMM_UPPER_CD = 'CMMP00000000043'
+                                           AND USE_YN = 'Y' AND CMM_CD NOT IN ('CMMC00000000204' ,'CMMC00000000248','CMMC00000001086')
+         )
+         SELECT
+             CN_KND_NM CNKNDNM,
+             CN_KND_CD CNKNDCD, -- 코인코드
+             NVL(POS_AMT, 0) POSAMT, --보유수량
+             TRUNC(AVG_CN_PRC,0) AVGCNPRC, --구매평균가
+             NVL(TRUNC((POS_AMT * TRUNC(AVG_CN_PRC,0)),0), 0) CSHPRC, --구매총액
+             NVL(CNPRC,0) AS CNPRC,
+             NVL(TRUNC ((POS_AMT * CNPRC), 0),0) AS EVALPRC, -- 평가금액
+             NVL(TRUNC (( (POS_AMT * CNPRC) - (POS_AMT * AVG_CN_PRC)), 0),0) AS EVALPNLPRC, -- 평가손익
+             RTRIM(TO_CHAR(NVL(ROUND(DECODE((POS_AMT * AVG_CN_PRC), 0 ,0,  ((POS_AMT*CNPRC)-(POS_AMT * AVG_CN_PRC))/(POS_AMT * AVG_CN_PRC)), 4), 0),'FM9999990.000'),'.') * 100 MARGINRATE, -- 수익률(평가손익/구매금액)
+             (SELECT CMM_SN FROM TB_30171021 tbl WHERE CN_KND_CD = tbl.CMM_CD) CMMSN
+         FROM
+             (
+
+                 SELECT T1.CMM_CD CN_KND_CD,
+                        T1.CMM_NM AS CN_KND_NM,
+                     T1.CNPRC,
+                        ((T2.TOT_AMT + T2.EX_IN_AMT) - T2.TOT_SEL_AMT + T2.CNCL_AMT- T2.BUY_FEE_AMT) AS POS_AMT,  --보유수량
+                     T3.BUY_AMT,  --구매수량
+                        NVL(T3.AVG_CN_PRC,0) AS AVG_CN_PRC, --구매평균가
+                        NVL(T3.CSH_PRC,0) AS CSH_PRC        --구매총액
+                 FROM
+                     COIN_LST T1
+                     , (SELECT * FROM TB_10171028 WHERE USER_EMAIL = #{userEmail}) T2
+                     , (
+                           SELECT CN_KND_CD ,
+                               SUM(CN_EXCHG_AMT) AS BUY_AMT,
+                               AVG(EX_BUY_PRC/CN_EXCHG_AMT) AS AVG_CN_PRC,
+                               SUM(EX_BUY_PRC) AS CSH_PRC
+                           FROM (
+                               SELECT CN_KND_CD,
+                                   CN_EXCHG_AMT,
+                                   EX_BUY_PRC
+                               FROM TB_301710432
+                               WHERE USER_EMAIL = #{userEmail}
+                                     AND EX_BUY_PRC > 0
+                               UNION ALL
+                               SELECT CN_KND_CD,
+                                   CN_EXCHG_AMT,
+                                   EX_BUY_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('ETH') ) AS EX_BUY_PRC
+                               FROM ETH_TB_301710432
+                               WHERE USER_EMAIL = #{userEmail}
+                                     AND EX_BUY_PRC > 0
+                               UNION ALL
+                               SELECT CN_KND_CD,
+                                   CN_EXCHG_AMT,
+                                   EX_BUY_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('ETH') ) AS EX_BUY_PRC
+                               FROM BTC_TB_301710432
+                               WHERE USER_EMAIL = #{userEmail}
+                                     AND EX_BUY_PRC > 0
+                               UNION ALL
+                               SELECT CN_KND_CD,
+                                   CN_EXCHG_AMT,
+                                   EX_BUY_PRC * 1000  AS EX_BUY_PRC
+                               FROM USDT_TB_301710432
+                               WHERE USER_EMAIL = #{userEmail}
+                                     AND EX_BUY_PRC > 0
+                           )
+                           GROUP BY CN_KND_CD
+                       ) T3
+                 WHERE 1=1
+                       AND T1.CMM_CD = T2.CN_KND_CD(+)
+                       AND T1.CMM_CD = T3.CN_KND_CD(+)
+             ) A
+         WHERE 1=1
+         ORDER BY CMMSN
+
+
+  	</select>
+
+
+    <select id="getTimeList" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="com.bitkrx.api.trade.vo.TradePlusVO">
+
+
+        WITH COIN_LST AS (
+                SELECT CMM_CD, CMM_NM, CMM_SN,
+                     FN_CUR_PRICE('' , T1.CMM_CD)
+                        CNPRC
+                FROM TB_30171021 T1 WHERE CMM_UPPER_CD = 'CMMP00000000043'
+                                          AND USE_YN = 'Y' AND CMM_CD NOT IN ('CMMC00000000204' ,'CMMC00000000248','CMMC00000001086')
+        )
+        SELECT
+            CMM_NM CNKNDNM,
+            CMM_SN CMMSN,
+            CN_KND_CD CNKNDCD,
+            BUY_AMT BUYAMT,
+            TRUNC(BUY_AVG_PRC,0) as BUYAVGPRC,
+            RTRIM(TO_CHAR(BUY_TOT_PRC,'FM99999999990'),'.') BUYTOTPRC,
+            SEL_AMT SELAMT,
+            TRUNC(SEL_AVG_PRC,0) as SELAVGPRC,
+            TRUNC(SEL_TOT_PRC,0) as SELTOTPRC,
+            TRUNC((SEL_TOT_PRC - (SEL_AMT * BUY_AVG_PRC)),0) as PNLPRC,
+            RTRIM(TO_CHAR(
+                CASE
+                WHEN SEL_AMT = 0 OR BUY_AVG_PRC = 0 THEN 0
+                ELSE ROUND((SEL_TOT_PRC - (SEL_AMT * BUY_AVG_PRC))
+                           / (SEL_AMT * BUY_AVG_PRC) * 100, 4)
+                END
+            ,'FM9999990.000'),'.') MARGINRATE,
+            NVL(CNPRC, 0) CNPRC
+        FROM (SELECT T1.CMM_NM,
+                  T1.CMM_CD CN_KND_CD,
+                  T1.CNPRC,
+                  T1.CMM_SN,
+                  NVL (T3.CN_EXCHG_AMT, 0) AS BUY_AMT,
+                  NVL (T3.AVG_CN_PRC, 0) AS BUY_AVG_PRC,
+                  NVL (T3.CSH_PRC, 0) AS BUY_TOT_PRC,
+                  NVL (T4.CN_EXCHG_AMT, 0) AS SEL_AMT,
+                  NVL (T4.AVG_CN_PRC, 0) AS SEL_AVG_PRC,
+                  NVL (T4.CSH_PRC, 0) AS SEL_TOT_PRC
+              FROM COIN_LST T1,
+                  (SELECT * FROM TB_10171028 WHERE USER_EMAIL =#{userEmail}) T2,
+                  (
+                      SELECT CN_KND_CD ,
+                          SUM(CN_EXCHG_AMT) AS CN_EXCHG_AMT,
+                          AVG(EX_BUY_PRC/CN_EXCHG_AMT) AS AVG_CN_PRC,
+                          SUM(EX_BUY_PRC) AS CSH_PRC
+                      FROM (
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_BUY_PRC
+                          FROM TB_301710432
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND EX_BUY_PRC > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_BUY_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('ETH') ) AS EX_BUY_PRC
+                          FROM ETH_TB_301710432
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND EX_BUY_PRC > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_BUY_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('ETH') ) AS EX_BUY_PRC
+                          FROM BTC_TB_301710432
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND EX_BUY_PRC > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_BUY_PRC * 1000  AS EX_BUY_PRC
+                          FROM USDT_TB_301710432
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND EX_BUY_PRC > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                      )
+                      GROUP BY CN_KND_CD
+
+                  ) T3,
+                  (
+                      SELECT CN_KND_CD,
+                          AVG (EX_SEL_PRC / CN_EXCHG_AMT) AS AVG_CN_PRC,
+                          SUM (EX_SEL_PRC) AS CSH_PRC,
+                          SUM (CN_EXCHG_AMT) AS CN_EXCHG_AMT
+                      FROM (
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_SEL_PRC
+                          FROM TB_301710442
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND SEL_PRC > 0
+                                AND CN_EXCHG_AMT > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_SEL_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('ETH') ) AS EX_BUY_PRC
+                          FROM ETH_TB_301710442
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND SEL_PRC > 0
+                                AND CN_EXCHG_AMT > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_SEL_PRC * (SELECT CNPRC FROM  COIN_LST C1 WHERE C1.CMM_CD = FN_MK_GETNM('BTC') ) AS EX_BUY_PRC
+                          FROM BTC_TB_301710442
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND SEL_PRC > 0
+                                AND CN_EXCHG_AMT > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                          UNION ALL
+                          SELECT CN_KND_CD,
+                              CN_EXCHG_AMT,
+                              EX_SEL_PRC * 1000  AS EX_BUY_PRC
+                          FROM USDT_TB_301710442
+                          WHERE USER_EMAIL = #{userEmail}
+                                AND SEL_PRC > 0
+                                AND CN_EXCHG_AMT > 0
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ >= ]]>  #{stdDate}
+                                AND TO_CHAR (REG_DT, 'YYYY-MM-DD')  <![CDATA[ <= ]]>  #{endDate}
+                      )
+                      GROUP BY CN_KND_CD
+                  ) T4
+              WHERE     T1.CMM_CD = T2.CN_KND_CD(+)
+                        AND T1.CMM_CD = T3.CN_KND_CD(+)
+                        AND T1.CMM_CD = T4.CN_KND_CD(+)
+             ) A ORDER BY CMM_SN
+
+  	</select>
+
+    <select id="getExRate" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.ExRateVO">
+        WITH USERNATN AS (
+            SELECT * FROM TB_50171003 WHERE NATN_CODE =
+                (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                     (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+        SELECT
+            (SELECT CRY_CODE FROM USERNATN) CRYCODE,
+            (SELECT MAX(EX_RATE) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) FROM TB_50171011 WHERE CRY_CODE = (SELECT CRY_CODE FROM USERNATN)) EXRATE,
+            (SELECT MAX(REG_DT) FROM TB_50171011) REGDT
+        FROM VW_MNY_INFO T1, TB_10171022 T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL(+)
+        AND T1.USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getSellCancelOrder" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="String">
+        SELECT
+            CN_SEL_CODE
+        FROM(
+            SELECT
+                *
+            FROM VW_EX_SEL_INFO
+            WHERE IS_SOLD_OUT = 'N'
+                  AND SEL_USER_EMAIL = #{userEmail}
+                  AND CN_KND_CD = #{sellCurcyCd}
+            ORDER BY SEL_PRC DESC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getBuyCancelOrder" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="String">
+        SELECT
+            CN_PHS_CODE
+        FROM(
+            SELECT
+                *
+            FROM VW_EX_BUY_INFO
+            WHERE IS_BUY_ALL = 'N'
+                  AND BUY_USER_EMAIL = #{userEmail}
+                  AND CN_KND_CD = #{buyCurcyCd}
+            ORDER BY CN_PRC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getRandomSellCancelOrder" parameterType="String" resultType="String">
+        SELECT
+            CN_SEL_CODE
+        FROM(
+            SELECT
+                *
+            FROM VW_EX_SEL_INFO S
+            WHERE IS_SOLD_OUT = 'N'
+                  --AND SEL_USER_EMAIL IN ('jbd76@naver.com','nodo1017@gmail.com','banbanguy@naver.com','visop@naver.com','z01lkss@naver.com')
+                  AND SEL_USER_EMAIL IN ('wjddlsdud919@gmail.com','banbanguy@daum.net','ymin2715@naver.com','visop02@naver.com','z01lkss@nate.com')
+                  AND CN_KND_CD = #{value}
+            ORDER BY SEL_PRC DESC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="getRandomBuyCancelOrder" parameterType="String" resultType="String">
+        SELECT
+            CN_PHS_CODE
+        FROM(
+            SELECT
+                *
+            FROM VW_EX_BUY_INFO
+            WHERE IS_BUY_ALL = 'N'
+                  --AND BUY_USER_EMAIL IN ('jbd76@naver.com','nodo1017@gmail.com','banbanguy@naver.com','visop@naver.com','z01lkss@naver.com')
+                  AND BUY_USER_EMAIL IN ('wjddlsdud919@gmail.com','banbanguy@daum.net','ymin2715@naver.com','visop02@naver.com','z01lkss@nate.com')
+                  AND CN_KND_CD = #{value}
+            ORDER BY CN_PRC)
+        WHERE ROWNUM = 1
+    </select>
+
+    <select id="isPricePer" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="String">
+        SELECT
+            TRUNC(FN_CUR_PRICE('', #{curcyCd}) / #{cnPrc}, 2)
+        FROM DUAL
+    </select>
+
+    <select id="selectLowPriceSellList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+
+        SELECT
+            CN_SEL_CODE AS ORDERNO,
+            SEL_PRC CNPRC,
+            CN_KND_CD CURCYCD,
+            CASE WHEN CN_EXCHG_AMT > 0 THEN 'Y'
+            ELSE 'N' END ISTRADE,
+            TO_CHAR(CN_REM_AMT, 'FM99999999990.00000000') REMAMT,
+            (SELECT CNCL_SEL_AMT FROM TB_30171044 WHERE CN_SEL_CODE = T1.CN_SEL_CODE) CNCL,
+            SEL_USER_EMAIL USEREMAIL
+        FROM VW_EX_SEL_INFO T1
+        WHERE IS_SOLD_OUT = 'N'
+        AND CN_KND_CD = #{curcyCd}
+        AND SEL_USER_EMAIL IN ('banbanguy@daum.net','ymin2715@naver.com','visop@naver.com')
+        AND CN_REM_AMT <![CDATA[ > ]]> 0
+        AND SEL_PRC <![CDATA[ < ]]> #{cnPrc}
+        ORDER BY SEL_PRC
+    </select>
+
+    <select id="selectHighPriceBuyList" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.CmeTradeReqVO">
+        SELECT
+            CN_PHS_CODE AS ORDERNO,
+            TO_CHAR(CN_REM_AMT, 'FM99999999990.00000000') REMAMT,
+            CN_PRC CNPRC,
+            CN_KND_CD CURCYCD,
+            CASE WHEN CN_EXCHG_AMT > 0 THEN 'Y'
+            ELSE 'N' END ISTRADE,
+            BUY_SUM_PRC - EX_BUY_PRC REMPRC,
+            BUY_SUM_PRC TOTPRC,
+            (SELECT CNCL_BUY_PRC FROM TB_30171043 WHERE CN_PHS_CODE = T1.CN_PHS_CODE) CNCL,
+            BUY_USER_EMAIL USEREMAIL
+        FROM VW_EX_BUY_INFO T1
+        WHERE IS_BUY_ALL = 'N'
+        AND BUY_USER_EMAIL IN ('banbanguy@daum.net','ymin2715@naver.com','visop@naver.com')
+        AND CN_KND_CD = #{curcyCd}
+        AND CN_REM_AMT <![CDATA[ > ]]> 0
+        AND CN_PRC <![CDATA[ > ]]> #{cnPrc}
+        ORDER BY CN_PRC DESC
+
+    </select>
+
+
+
+    <select id="getCoinCoreInfoList" resultType="com.bitkrx.api.trade.vo.CoinCoreInfoVO">
+
+        SELECT
+            CMM_CD CURCYCD,
+            CMM_NM CURCYNM,
+            URL_INFO URLINFO,
+            FILTER1 CURCYTYPE,
+            FILTER2 CONFIRMCNT,
+            FILTER3 MOVEFEE
+        FROM
+            TB_30171021
+        WHERE
+            CMM_UPPER_CD = 'CMMP00000000043'
+        AND
+            USE_YN = 'Y'
+        AND
+            URL_INFO IS NOT NULL
+        ORDER BY
+            CMM_SN
+    </select>
+
+    <select id="realKRWPrice" parameterType="String" resultType="String">
+           SELECT
+                rtrim(to_char(NVL(FN_CUR_PRICE('S',T.CMM_CD),0),'FM99999999990.99999999'),'.')
+           FROM(
+                SELECT * FROM TB_30171021
+            WHERE CMM_UPPER_CD = 'CMMP00000000043'
+                AND CMM_CD = #{curcyCd} ) T
+    </select>
+
+    <select id="getTodaySellAmt" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="String">
+		SELECT
+			SUM(NVL(SEL_AMT, 0)) - SUM(NVL(CNCL_SEL_AMT, 0))
+		FROM TB_301710442
+		WHERE USER_EMAIL = #{userEmail}
+		AND CN_KND_CD = #{curcyCd}
+		AND REG_DT > TO_DATE(TO_CHAR(SYSDATE, 'YYYYMMDD'), 'YYYYMMDD')
+	</select>
+
+    <select id="getTodayBuyAmt" parameterType="com.bitkrx.api.trade.vo.TradeParamVO" resultType="String">
+		SELECT
+            SUM(NVL(CSH_PRC, 0)) - SUM(NVL(CNCL_BUY_PRC , 0))
+        FROM TB_301710432
+        WHERE USER_EMAIL = #{userEmail}
+        AND CN_KND_CD = #{curcyCd}
+        AND REG_DT > TO_DATE(TO_CHAR(SYSDATE, 'YYYYMMDD'), 'YYYYMMDD')
+	</select>
+
+    <select id="selectCoinTradeCheck"  parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.common.vo.CoinMinMaxVO">
+       SELECT
+               RTRIM(TO_CHAR(BUY_LMT_1GHL,'FM999999999990.9999999999'),'.') BUYLMT1ONCE,
+               RTRIM(TO_CHAR(SEL_LMT_1GHL,'FM999999999990.9999999999'),'.') SELLMT1ONCE,
+               RTRIM(TO_CHAR(BUY_LMT_1DAY,'FM999999999990.9999999999'),'.') BUYLMT1DAY,
+               RTRIM(TO_CHAR(SEL_LMT_1DAY,'FM999999999990.9999999999'),'.') SELLMT1DAY
+       FROM
+               TB_50171050
+       WHERE
+               MK_CN_KND_CD = #{mkState}
+       AND
+               USE_CN_KND_CD = #{curcyCd}
+    </select>
+
+    <select id="getSellNoChk" parameterType="String" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM TB_30171044 T
+        WHERE
+           CN_SEL_CODE = #{value}
+    </select>
+
+    <select id="getBuyNoChk" parameterType="String" resultType="int">
+      SELECT
+        COUNT(*)
+      FROM
+        TB_30171043
+      WHERE
+        CN_PHS_CODE = #{value}
+    </select>
+
+    <select id="getFeeSale" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.FeeSaleVO">
+        SELECT
+        CASE -- 구분(B:구매,S:판매,W:출금,T:송금)
+        WHEN GUBUN = '1' THEN 'B'
+        WHEN GUBUN = '2' THEN 'S'
+        WHEN GUBUN = '3' THEN 'W'
+        WHEN GUBUN = '4' THEN 'T'
+        END GUBUN
+        ,DISCT
+        ,STD_DT stdDt -- 시작일
+        ,END_DT endDt -- 종료일
+        FROM TB_60180013
+        WHERE CNCL_YN = 'N'
+        AND STD_DT <![CDATA[ <= ]]>  TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND END_DT <![CDATA[ >= ]]> TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getFreeWithdraw" parameterType="com.bitkrx.api.trade.vo.CmeTradeReqVO" resultType="com.bitkrx.api.trade.vo.FreeWithdrawVO">
+        SELECT
+        CN_KND_CD cnKndCd --코드nm
+        , FN_CMM_CD(CN_KND_CD, '') CnKndNm
+        , STD_DT stdDt --시작일
+        , END_DT endDt --종료일
+        FROM TB_60180012
+        WHERE CNCL_YN = 'N'
+        AND STD_DT <![CDATA[ <= ]]> TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND END_DT <![CDATA[ >= ]]> TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getCoinTradePrc" resultType="com.bitkrx.api.trade.vo.CoinTradePrcVO">
+        SELECT
+        T1.*
+        , (SELECT RTRIM(TO_CHAR(ASKING,'FM99999999990.99999999'),'.') ASKING FROM TB_60180011 WHERE MK_CN_KND_CD = 'CMMC00000000204' AND MIN_AMT <![CDATA[ <= ]]> T1.COINPRC AND MAX_AMT <![CDATA[ > ]]> T1.COINPRC) KRW
+        , (SELECT RTRIM(TO_CHAR(ASKING,'FM99999999990.99999999'),'.') ASKING FROM TB_60180011 WHERE MK_CN_KND_CD = 'CMMC00000000205') BTC
+        , (SELECT RTRIM(TO_CHAR(ASKING,'FM99999999990.99999999'),'.') ASKING FROM TB_60180011 WHERE MK_CN_KND_CD = 'CMMC00000000206') ETH
+        , (SELECT RTRIM(TO_CHAR(ASKING,'FM99999999990.99999999'),'.') ASKING FROM TB_60180011 WHERE MK_CN_KND_CD = 'CMMC00000001086') USDT
+        FROM
+        (
+        SELECT cmm_cd cnKndCd, FN_CMM_CD(cmm_cd, '') cnKndNm, FN_CUR_PRICE('S',T1.CMM_CD) COINPRC
+        FROM TB_30171021 T1
+        WHERE CMM_UPPER_CD = 'CMMP00000000043'
+        AND CMM_CD NOT IN ('CMMC00000000204','CMMC00000000248','CMMC00000001005','CMMC00000001086','CMMC00000001467')
+        AND USE_YN = 'Y'
+        ORDER BY REG_DT
+        ) T1
+    </select>
+
+    <select id="getArcMarket" parameterType="com.bitkrx.api.auth.vo.UserTradeCheckVO" resultType="com.bitkrx.api.trade.vo.ArcMarketVO">
+        SELECT
+            MIN_AMT minAmt
+            , MAX_AMT maxAmt
+            ,  RTRIM(TO_CHAR(ASKING,'FM99999999990.99999999'),'.') ASKING
+        FROM TB_60180011
+        <if test="mkState != '' ">
+            WHERE MK_CN_KND_CD = #{mkState}
+        </if>
+        ORDER BY MK_CN_KND_CD, MIN_AMT DESC
+    </select>
+
+    <select id="getCmmNm" resultType="String">
+        SELECT
+          CMM_NM
+        FROM TB_30171021
+        WHERE 1=1
+        AND CMM_CD = 'CMMC00000000204'
+    </select>
+</mapper>

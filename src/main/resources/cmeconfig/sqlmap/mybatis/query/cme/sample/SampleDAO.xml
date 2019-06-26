@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SampleDAO">
+		
+		<select id="selectBoard" resultType="String">
+		
+			select NEXT_ID from IDS where TABLE_NAME = 'FILE_ID' 
+				
+		</select>
+		
+		<select id="selectMarket" resultType="String">
+		
+			select cust_id from mk9800025 where cust_id = 'ymin2715' and rownum =1
+				
+		</select>
+		
+		<select id="selectBitkrx" resultType="String">
+		
+			select user_email from TB_10171020 where user_email = 'ymin2715@cmesoft.co.kr' and rownum =1
+				
+		</select>
+		
+ 	
+ 	
+ 	
+ 	<select id="getMailList" parameterType="com.bitkrx.api.sample.vo.bataMailVO" resultType="com.bitkrx.api.sample.vo.bataMailVO">
+		
+		SELECT 
+		    USER_EMAIL AS USEREMAIL, 
+		    USER_NM AS USERNM, 
+		    USER_MOBILE AS USERMOBILE
+		FROM 
+		    TB_10171020
+			
+	</select>
+
+	<select id="getUserName" parameterType="String" resultType="String">
+		SELECT
+		    USER_NM
+		FROM
+		    TB_10171020
+	    WHERE
+	    	USER_EMAIL = #{value}
+
+	</select>
+		
+	<update id="updateMailSend" parameterType="String" >
+		
+		update
+			TB_BETAMAILLIST
+		set
+			send_yn = 'Y'
+		where
+			user_email = #{value}
+		
+			
+	</update>
+		
+	<select id="getMilliTime" resultType="String">
+
+		SELECT 
+		  EXTRACT(DAY FROM (SYSDATE-TO_TIMESTAMP_TZ('01-01-70 0', 'DD-MM-RR TZH')))*1000*60*60*24
+		  + EXTRACT(HOUR FROM (SYSDATE-TO_TIMESTAMP_TZ('01-01-70 0', 'DD-MM-RR TZH')))*1000*60*60
+		  + EXTRACT(MINUTE FROM (SYSDATE-TO_TIMESTAMP_TZ('01-01-70 0', 'DD-MM-RR TZH')))*1000*60
+		  + EXTRACT(SECOND FROM (SYSDATE-TO_TIMESTAMP_TZ('01-01-70 0', 'DD-MM-RR TZH')))*1000
+		    AS MILLIS
+		FROM DUAL
+			
+	</select>
+
+	<select id="getDateTime" resultType="String">
+
+		SELECT TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:Mi:SS') FROM DUAL
+
+	</select>
+
+</mapper>

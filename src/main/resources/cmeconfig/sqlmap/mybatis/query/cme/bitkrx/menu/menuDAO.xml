@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="menuDAO">
+	<resultMap id="menuMap" type="hashmap"/>
+	
+	<update id="PR_INSUPT10172010" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_INSUPT10172010(
+			#{menuCd		,mode=IN,jdbcType=VARCHAR},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{sn			,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=menuMap} ) }
+	</update>
+	
+	<delete id="deleteMenu" parameterType="String">
+		DELETE FROM TB_10172010 WHERE USER_EMAIL = #{value}
+	</delete>
+	
+	<select id="getMenuList" parameterType="com.bitkrx.api.menu.vo.MenuVO" resultType="com.bitkrx.api.menu.vo.MenuResVO">
+		SELECT 
+			SN,
+    		CMM_CD MENUCD 
+		FROM TB_10172010
+		WHERE USER_EMAIL = #{userEmail}
+		ORDER BY SN
+	</select>
+
+	<select id="SendAdminAllMail" parameterType="com.bitkrx.api.mail.vo.MailVO" resultType="com.bitkrx.api.mail.vo.MailVO">
+		SELECT
+            USER_EMAIL
+        FROM
+            TB_10171050
+        WHERE
+            USE_YN = 'Y'
+        AND
+            EMAIL_SND_YN = 'Y'
+	</select>
+
+	<select id="getSN" parameterType="String" resultType="String">
+		SELECT
+			MAX(SN)
+		FROM
+			TB_101720102
+		WHERE
+			USER_EMAIL = #{value}
+	</select>
+
+	<update id="insMtsMenu" parameterType="com.bitkrx.api.menu.vo.MenuVO">
+		INSERT INTO
+			TB_101720102
+			(MK_CMM_CD , CMM_CD , USER_EMAIL , SN , REG_DT)
+		VALUES
+			(#{mkState} , #{menuCd} , #{userEmail} , NVL((SELECT MAX(SN) FROM TB_101720102 WHERE USER_EMAIL = #{userEmail}), 0) + 1 , SYSDATE)
+	</update>
+
+	<delete id="delMtsMenu" parameterType="com.bitkrx.api.menu.vo.MenuVO">
+		DELETE
+			TB_101720102
+		WHERE
+			USER_EMAIL = #{userEmail}
+		AND
+			CMM_CD = #{menuCd}
+		AND
+			MK_CMM_CD = #{mkState}
+	</delete>
+
+	<select id="getMtsMenuList" parameterType="com.bitkrx.api.menu.vo.MenuVO" resultType="com.bitkrx.api.menu.vo.MenuVO">
+		SELECT
+			MK_CMM_CD MKSTATE,
+			CMM_CD MENUCD,
+			USER_EMAIL USEREMAIL,
+			SN,
+			REG_DT REGDT
+		FROM
+			TB_101720102
+		WHERE
+		 	USER_EMAIL = #{userEmail}
+		<if test="mkState != null and mkState != '' ">
+			AND MK_CMM_CD = #{mkState}
+		</if>
+		ORDER BY SN DESC
+	</select>
+</mapper>

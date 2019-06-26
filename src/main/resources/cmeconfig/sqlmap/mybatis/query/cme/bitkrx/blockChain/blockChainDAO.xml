@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="blockChainDAO">
+
+    <select id="selectEthBlockList" parameterType="com.bitkrx.api.block.vo.BlockChainVO" resultType="com.bitkrx.api.block.vo.BlockChainVO">
+        SELECT
+            TX_ID TXID,
+            TX_BLOCKNUMBER TXBLOCKNUMBER,
+            TX_GAS TXGAS,
+            TX_GAS_PRICE TXGASPRICE,
+            TX_FROM TXFROM,
+            TX_TO TXTO,
+            TX_VALUE TXVALUE,
+            USE_YN USEYN,
+            CREATE_DATE CREATEDATE,
+            EXCHANGE_CODE EXCHANGECODE,
+            BLOCK_CMT BLOCKCMT
+        FROM TBL_ETH_BLOCK
+        WHERE USE_YN = 'N'
+        AND TX_TO = UPPER(#{txTo})
+    </select>
+
+    <update id="uptEthBlockUseYn" parameterType="com.bitkrx.api.block.vo.BlockChainVO" >
+
+        UPDATE TBL_ETH_BLOCK SET USE_YN = 'Y' WHERE TX_ID = #{txId}
+    </update>
+
+</mapper>

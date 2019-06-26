@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="coinInfoDAO">
+
+    <select id="getCoinInfo" parameterType="com.bitkrx.api.common.vo.CoinInfoVO" resultType="com.bitkrx.api.common.vo.CoinInfoVO">
+
+        SELECT * FROM(
+            SELECT
+            COIN_INFO_CD COININFOCD
+            ,CN_KND_CD CNKNDCD
+            ,TITLE TITLE
+            ,SHOW_YN SHOWYN
+            ,FIRST_PUSH_AMT FIRSTPUSHAMT
+            ,PUSH_MTH PUSHMTH
+            ,MKT_TOT_PRC MKTTOTPRC
+            ,CUR_TOT_AMT CURTOTAMT
+            ,MAX_AMT MAXAMT
+            ,PUB_URL PUBURL
+            ,ATCH_FILE_ID ATCHFILEID
+            ,LANG_CD LANGCD
+            ,ETC1 ETC1
+            ,ETC2 ETC2
+            ,FN_CMM_CD(CN_KND_CD, '') ABB
+            FROM TB_10171075
+            WHERE 1=1
+            AND LANG_CD = #{langCd}
+            AND CN_KND_CD = #{cnKndCd}
+            AND SHOW_YN = 'Y'
+            ORDER BY REG_DT DESC)
+        WHERE ROWNUM = 1
+
+    </select>
+
+    <select id="getCoinDailyPrc" parameterType="com.bitkrx.api.common.vo.CoinDailyPrcVO" resultType="com.bitkrx.api.common.vo.CoinDailyPrcVO" >
+
+        SELECT TT.*
+            FROM (SELECT ROWNUM AS RN, T.*
+                FROM (
+            SELECT
+                T1.*,
+                NVL(ROUND(LSTPRC / LEAD(LSTPRC) OVER(ORDER BY REGDT DESC) * 100 - 100, 2), 0) PRCPER
+            FROM(
+                SELECT
+                     EX_CN_KND_CD CNKNDCD,
+                     TO_CHAR(REG_DT, 'YYYY.MM.DD') REGDT,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT) FSTPRC,
+                     MIN(EX_CN_PRC) MINPRC,
+                     MAX(EX_CN_PRC) MAXPRC,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) LSTPRC,
+                     SUM(CN_EXCHG_AMT) TOTAMT
+                FROM TB_20171030_M01
+                WHERE EX_CN_KND_CD = #{cnKndCd}
+            <if test="endDate != '' and stdDate != '' ">
+                AND REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+                GROUP BY EX_CN_KND_CD, TO_CHAR(REG_DT, 'YYYY.MM.DD')) T1) T) TT
+        WHERE
+            1 = 1
+        AND
+            RN BETWEEN #{firstIndex} + 1 AND #{firstIndex} + #{recordCountPerPage}
+
+    </select>
+
+    <select id="getCoinDailyPrcCnt" parameterType="com.bitkrx.api.common.vo.CoinDailyPrcVO" resultType="int" >
+
+            SELECT
+                COUNT(1)
+            FROM(
+                SELECT
+                     EX_CN_KND_CD CNKNDCD,
+                     TO_CHAR(REG_DT, 'YYYY.MM.DD') REGDT,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT) FSTPRC,
+                     MIN(EX_CN_PRC) MINPRC,
+                     MAX(EX_CN_PRC) MAXPRC,
+                     MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC) LSTPRC,
+                     SUM(CN_EXCHG_AMT) TOTAMT
+                FROM TB_20171030_M01
+                WHERE EX_CN_KND_CD = #{cnKndCd}
+            <if test="endDate != '' and stdDate != '' ">
+                AND REG_DT BETWEEN TO_DATE(#{stdDate },'YYYY-MM-DD') AND TO_DATE(#{endDate },'YYYY-MM-DD') + 1 - 1 / 24 / 60 / 60
+            </if>
+                GROUP BY EX_CN_KND_CD, TO_CHAR(REG_DT, 'YYYY.MM.DD')) T1
+
+    </select>
+
+    <select id="getCoinMinMaxInfo" resultType="com.bitkrx.api.common.vo.CoinMinMaxVO">
+
+        WITH TB1 AS (
+            SELECT
+                CMM_SN,
+                CMM_NM AS CN_KND_NM,
+                CMM_CD AS CN_KND_CD
+            FROM TB_30171021
+            WHERE CMM_UPPER_CD = 'CMMP00000000043'
+            AND USE_YN = 'Y'
+            AND CMM_CD NOT IN ('CMMC00000000248')
+        )
+        SELECT
+              T1.CN_KND_CD CNKNDCD
+            , T1.CN_KND_NM CNKNDNM/* 기본 통화 표시명*/
+            , NVL(T2.COIN_DECIMAL , 0) COINDECIMAL/* 코인 소수점 자릿수*/
+            , NVL(T2.ASKING , 0) ASKING /* 호가*/
+            , NVL(RTRIM(TO_CHAR(T2.TRADE_MIN_AMT,'FM99999999990.99999999'),'.') , 0) TRADEMINAMT /* 체결 최소수량*/
+            , NVL(RTRIM(TO_CHAR(T2.TRADE_MAX_AMT,'FM99999999990.99999999'),'.') , 0) TRADEMAXAMT /* 체결 최대수량*/
+            , NVL(RTRIM(TO_CHAR(T2.TRADE_MIN_PRC,'FM99999999990.99999999'),'.') , 0) TRADEMINPRC /* 체결 최소 금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MIN_AMT,'FM99999999990.99999999'),'.') , 0) MINAMT2 /* 1회 출금한도최소 금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MAX_AMT,'FM99999999990.99999999'),'.') , 0) MAXAMT2 /* 1회 출금한도최대 금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MAX_AMT_1DAY,'FM99999999990.99999999'),'.') , 0) MAXAMTDAY2 /* 1일 출금 한도금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MIN_AMT_L3,'FM99999999990.99999999'),'.') , 0) MINAMT3 /* 1회 출금한도최소 금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MAX_AMT_L3,'FM99999999990.99999999'),'.') , 0) MAXAMT3 /* 1회 출금한도최대 금액*/
+            , NVL(RTRIM(TO_CHAR(T3.MAX_AMT_1DAY_L3,'FM99999999990.99999999'),'.') , 0) MAXAMTDAY3 /* 1일 출금 한도금액*/
+            , NVL(RTRIM(TO_CHAR(T4.CN_SND_FEE,'FM99999999990.99999999'),'.') , 0) CNSNDFEE /*출금수수료*/
+            , T2.COIN_INOUT_YN COININOUTYN
+            , NVL(T5.IS_TAG,'N') ISTAG
+            , CASE
+              WHEN T2.DECIMAL_YN = 'N' THEN 0
+              ELSE NVL(T2.DECIMAL_OPT , 0)
+              END AS CASHDECIMAL
+        FROM TB1 T1/* 공통환경정보 */
+            , TB_10171077 T2 /* 코인별 체결제한 금액 */
+            , TB_10171074 T3 /* 코인별 출금한도 */
+            , TB_10171067 T4 /* 코인별 출금수수료 정보 */
+            , TB_50171052 T5 /* 코인별 태그유무 */
+        WHERE 1 = 1
+        AND T1.CN_KND_CD = T2.CN_KND_CD
+        AND T1.CN_KND_CD = T3.CN_KND_CD
+        AND T1.CN_KND_CD = T4.CN_KND_CD
+        AND T1.CN_KND_CD = T5.CN_KND_CD(+)
+        ORDER BY T1.CMM_SN
+
+    </select>
+
+
+    <select id="getCoinPayInfo" parameterType="com.bitkrx.api.common.vo.CoinPayVO" resultType="com.bitkrx.api.common.vo.CoinPayVO">
+
+        SELECT
+        T1.CMM_CD CNKNDCD
+        , T1.CMM_NM CNKNDNM
+        , NVL(T2.CNPRC, 0) CNPRC -- 현재시가
+        , CASE
+            WHEN T1.CMM_CD = 'CMMC00000000204' THEN '10000'
+            WHEN NVL(T2.CNPRC, 0) = 0 THEN '0'
+            ELSE RTRIM(TO_CHAR(ROUND(10000 / T2.CNPRC, 8),'FM99999999990.99999999'),'.')
+          END PAYAMT
+        --, DECODE(T1.CMM_CD, 'CMMC00000000204' , 10 , RTRIM(TO_CHAR(ROUND(10 / T2.CNPRC, 8),'FM99999999990.00000000'),'.')) PAY_AMT -- 결제금액
+        --결제금액이 0인경우 사용불가
+        FROM
+        (
+        SELECT CMM_CD, CMM_NM
+        FROM TB_30171021
+        WHERE CMM_UPPER_CD = 'CMMP00000000043'
+        AND CMM_CD != 'CMMC00000000248'
+        --AND CMM_CD IN ( 'CMMC00000000204','CMMC00000000205','CMMC00000000206','CMMC00000000207','CMMC00000000208')
+        AND USE_YN = 'Y'
+
+        ) T1,
+        (
+        <choose>
+            <when test = "cnKndCd == 'CMMC00000000204' ">
+                SELECT '10000' AS CNPRC FROM DUAL
+            </when>
+            <otherwise>
+                SELECT CN_PRC AS CNPRC FROM TB_CN_PRC
+                WHERE CN_KND_CD = #{cnKndCd}
+            </otherwise>
+        </choose>
+        ) T2
+        <if test="cnKndCd != '' ">
+            WHERE T1.CMM_CD = #{cnKndCd}
+        </if>
+        ORDER BY T1.CMM_CD
+
+    </select>
+
+    <update id="insUptMarketCapInfo" parameterType="HashMap" >
+
+        MERGE INTO TB_40171021
+        USING DUAL
+        ON ( COIN_NAME = #{coinName})
+        WHEN MATCHED THEN
+        UPDATE SET
+          MARKET_CAP = #{marketCap},
+          PRICE = #{price},
+          VOLUME = #{volume},
+          CIR_SUPPLY = #{cirSupply},
+          CHANGE = #{change}
+        WHEN NOT MATCHED THEN
+        INSERT (
+          SEQ, COIN_NAME, MARKET_CAP, PRICE, VOLUME,
+          CIR_SUPPLY, CHANGE, SYMBOL
+        )
+        VALUES (
+            NVL((SELECT MAX(SEQ) + 1 FROM TB_40171021), 0),
+            #{coinName}, #{marketCap}, #{price}, #{volume},
+            #{cirSupply}, #{change}, #{symbol}
+        )
+
+    </update>
+
+
+    <resultMap type="HashMap" id="marketCapMap">
+        <result property="coinName" column="COIN_NAME"/>
+        <result property="marketCap" column="MARKET_CAP"/>
+        <result property="price" column="PRICE"/>
+        <result property="volume" column="VOLUME"/>
+        <result property="cirSupply" column="CIR_SUPPLY"/>
+        <result property="change" column="CHANGE"/>
+        <result property="symbol" column="SYMBOL"/>
+    </resultMap>
+
+    <select id="getMarketCapInfo" resultMap="marketCapMap">
+
+        SELECT
+          COIN_NAME,
+          MARKET_CAP,
+          PRICE,
+          VOLUME,
+          CIR_SUPPLY,
+          CHANGE,
+          SYMBOL
+        FROM TB_40171021
+        ORDER BY SEQ
+
+    </select>
+
+    <select id="getUseOkCoin" resultType="com.bitkrx.api.common.vo.CoinUseVO">
+        SELECT
+            CMM_CD CURCYCD,
+            CMM_DESC CURCYNM,
+            USE_YN USEYN
+        FROM
+            TB_30171021
+        WHERE
+            CMM_UPPER_CD = 'CMMP00000000043'
+        AND
+            USE_YN = 'Y'
+        AND
+            CMM_CD NOT IN('CMMC00000000204','CMMC00000000248')
+        ORDER BY CMM_CD
+    </select>
+
+    <select id="getCoinBalanceList" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.common.vo.CoinBalanceVO">
+        SELECT  T1.CURCYCD,
+            TO_CHAR(NVL(POSCNAMT, '0'),'FM999999999999990.00000000') CNAMT,
+            TO_CHAR(NVL(POSCNPRC, '0'),'FM999999999999990') USEPRICE,
+            TO_CHAR(NVL(POSCNPRC , '0'),'FM999999999999990') USEPRICEKRW,
+            TO_CHAR(NVL(CNPRC, '0'),'FM999999999999990') CNPRC,
+            TO_CHAR(NVL(CNPRC, '0'),'FM999999999999990') CNPRCKRW,
+            CASE
+                WHEN POSCNPRC = 0 THEN '0'
+                ELSE TO_CHAR(NVL(#{amount} / NVL(CNPRC, '0') , '0'),'FM999999999999990.00000000')
+            END POSCNAMT
+        FROM(
+                SELECT CMM_CD CURCYCD FROM TB_30171021 WHERE CMM_UPPER_CD = 'CMMP00000000043'
+                                                             AND USE_YN = 'Y' AND CMM_CD != 'CMMC00000000248'
+                                                             AND CMM_CD = #{curcyCd}
+            ) T1,
+            (SELECT
+                 CN_KND_CD CURCYCD,
+                 POS_AMT POSCNAMT,
+                 CNPRC * POS_AMT POSCNPRC,
+                 CNPRC
+             FROM
+                 (SELECT
+                      (SELECT
+                           MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC)
+                       FROM
+                           TB_20171030
+                       WHERE
+                           EX_CN_KND_CD = CN_KND_CD) CNPRC,
+                      USER_EMAIL,
+                      TOT_AMT,
+                      EX_AMT,
+                      (TOT_AMT + EX_IN_AMT) - TOT_SEL_AMT + CNCL_AMT - BUY_FEE_AMT
+                                                     POS_AMT,
+                      TOT_SEL_AMT - EX_OUT_AMT - CNCL_AMT USE_AMT,
+                      EX_IN_AMT,
+                      EX_OUT_AMT,
+                      BUY_FEE_AMT,
+                      TOT_SEL_AMT,
+                      CNCL_AMT,
+                      CN_KND_CD
+                  FROM TB_10171028 WHERE USER_EMAIL = #{userEmail})) T2
+        WHERE T1.CURCYCD = T2.CURCYCD(+)
+        ORDER BY CURCYCD
+    </select>
+
+    <select id="getCashBalanceList" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="com.bitkrx.api.common.vo.CashBalanceVO">
+
+        SELECT
+            NVL(REM_MNY, 0) - NVL(FN_GETPNT(USER_EMAIL), 0) USEPRICE,
+            CASE WHEN (SELECT USE_YN FROM TB_10171020 WHERE USER_EMAIL = #{userEmail}) = 'N' THEN 0
+            ELSE  NVL(REM_MNY, 0) - NVL(FN_GETPNT(USER_EMAIL), 0)
+            END AS USEPRICEKRW,
+            FN_EX_RATE('KRW') EXRATE,
+            (SELECT USER_NM FROM TB_10171020 WHERE USER_EMAIL = #{userEmail}) USERNM
+            <if test="amount != null and amount != '' ">
+            ,ROUND(#{amount} / FN_EX_RATE('KRW'), 2) CNAMT
+            </if>
+        FROM VW_MNY_INFO
+        WHERE USER_EMAIL = #{userEmail}
+    </select>
+
+    <select id="getUserEmail" parameterType="String" resultType="String">
+
+        SELECT USER_EMAIL FROM TB_50171031 WHERE CARD_NO = #{value} AND ROWNUM = 1
+    </select>
+
+    <resultMap type="hashmap" id="mkCoinMap">
+        <result property="curcyCd" column="CURCYCD"/>
+        <result property="curcyNm" column="CURCYNM"/>
+        <result property="mkType" column="MKTYPE"/>
+    </resultMap>
+
+    <select id="getMkCoinList" parameterType="String" resultMap="mkCoinMap">
+        SELECT
+        MK_CN_KND_CD MKTYPE,
+        USE_CN_KND_CD CURCYCD,
+        FN_CMM_CD(USE_CN_KND_CD, '') CURCYNM
+        FROM TB_50171050
+        WHERE 1 = 1
+        <if test="value != null and value != '' ">
+            AND MK_CN_KND_CD = #{value}
+        </if>
+        AND USE_YN = 'Y'
+        ORDER BY MKTYPE, USE_CN_KND_CD
+    </select>
+
+    <select id="getMarketFee" resultType="com.bitkrx.api.common.vo.MarketFeeVO">
+        SELECT RTRIM (TO_CHAR (T1.CN_PHS_FEE, 'FM99999999990.99999999'), '.')
+          AS CNPHSFEE ,
+       RTRIM (TO_CHAR (T1.CN_SEL_FEE, 'FM99999999990.99999999'), '.')
+          AS CNSELFEE
+        FROM TB_10171066 T1
+    </select>
+
+    <select id="getCoinAtmFee" parameterType="com.bitkrx.api.main.vo.CmeUserAssetReqVO" resultType="String">
+
+        SELECT
+            ROUND(#{amount} /
+                  NVL((SELECT
+                           MAX(EX_CN_PRC) KEEP (DENSE_RANK FIRST ORDER BY REG_DT DESC)
+                       FROM
+                           TB_20171030
+                       WHERE
+                           EX_CN_KND_CD = #{curcyCd}), 0) + 0.000000004, 8)
+        FROM DUAL
+    </select>
+
+    <select id="selectCoinCoreInfo" parameterType="com.bitkrx.api.common.vo.CoinCoreInfoListVO" resultType="com.bitkrx.api.common.vo.CoinCoreInfoListVO">
+        SELECT
+            CN_KND_CD CNKNDCD,
+            CN_KND_NM CNKNDNM,
+            COIN_TYPE COINTYPE,
+            IS_TAG ISTAG,
+            NEW_ACCOUNT_TYPE NEWACCOUNTTYPE,
+            GET_BALANCE_TYPE GETBALANCETYPE,
+            MOVE_TYPE MOVETYPE,
+            SEND_FEE SENDFEE,
+            SEND_TOKEN_FEE SENDTOKENFEE,
+            MAIN_ADDR MAINADDR,
+            MAIN_PASS MAINPASS,
+            IS_INTERNAL ISINTERNAL,
+            COIN_URL COINURL,
+            IS_TOKEN ISTOKEN,
+            COIN_SEND_URL COINSENDURL,
+            TOKEN_GET_BALANCE_URL TOKENGETBALANCEURL
+        FROM TB_50171052
+        WHERE USE_YN = 'Y'
+        <if test="cnKndCd != null and cnKndCd != '' ">
+            AND CN_KND_CD = #{cnKndCd}
+        </if>
+    </select>
+
+
+    <select id="getMarketTradeCheck" parameterType="String" resultType="com.bitkrx.api.common.vo.MarketTradeVO">
+        SELECT
+            T1.USE_CN_KND_CD CURCYCD,
+            T1.BUY_LMT_1GHL BUYLMT1ONCE,
+            T1.SEL_LMT_1GHL SELLMT1ONCE,
+            T1.BUY_LMT_1DAY BUYLMT1DAY,
+            T1.SEL_LMT_1DAY SELLMT1DAY,
+            T2.CMM_NM CURCYNM
+        FROM
+            TB_50171050 T1,
+            TB_30171021 T2
+        WHERE
+            T1.USE_YN = 'Y'
+        AND
+            T1.USE_CN_KND_CD = T2.CMM_CD
+        AND
+            T1.MK_CN_KND_CD = #{value}
+        ORDER BY T1.CMM_SN
+    </select>
+
+    <select id="getMarketInfo" resultType="com.bitkrx.api.common.vo.MarketTradeVO">
+        SELECT T1.CMM_CD CURCYCD, T1.CMM_NM CURCYNM
+               FROM TB_30171021 T1
+               WHERE     T1.CMM_UPPER_CD = 'CMMP00000000043'
+                         AND T1.CMM_CD NOT IN ('CMMC00000000248')
+                         AND T1.USE_YN = 'Y'
+                         AND T1.CMM_CD IN(
+                            SELECT MK_CN_KND_CD FROM TB_50171050 GROUP BY MK_CN_KND_CD
+                         )
+               ORDER BY T1.CMM_CD
+    </select>
+
+    <select id="getCoinNm" parameterType="String" resultType="String">
+        SELECT FN_CMM_CD(#{value} , '') FROM DUAL
+    </select>
+
+    <select id="selectDual" resultType="String">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="getCoinNote" parameterType="com.bitkrx.api.common.vo.CoinInfoVO" resultType="String">
+        SELECT
+          NOTE
+        FROM
+          TB_COMMON_EXCHG_NOTE
+        WHERE CN_LANG_CODE = #{langCd}
+        AND CN_KND_CD = #{cnKndCd}
+        AND USE_YN = 'Y'
+    </select>
+
+    <select id="commonExchgInfo" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="com.bitkrx.api.common.vo.CommonExchgInfoVO">
+        SELECT
+        exchg_Name exchgName,
+        cn_lang_code lang,
+        exchg_Url exchgUrl,
+        exchg_Ceo exchgCeo,
+        cic_Email cicEmail,
+        cic_Phone cicPhone,
+        bi
+        FROM tb_common_exchg_info
+        <choose>
+            <when test="lang != null and lang != '' ">
+                WHERE cn_lang_code =#{lang}
+            </when>
+            <otherwise>
+                WHERE cn_lang_code = 'ko'
+            </otherwise>
+        </choose>
+
+    </select>
+
+    <select id="getFile_sn" parameterType="com.bitkrx.api.auth.vo.SubmitCertVO" resultType="String">
+        SELECT
+          NVL(MAX(FILE_SN),0) AS FILE_SN
+        FROM LETTNFILEDETAIL
+        WHERE ATCH_FILE_ID = #{certCode}
+    </select>
+</mapper>

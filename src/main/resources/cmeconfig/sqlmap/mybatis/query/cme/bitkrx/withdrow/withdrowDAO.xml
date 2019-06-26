@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="withdrowDAO">
+	
+	<resultMap id="withdrowMap" type="hashmap"/>
+	
+	<update id="PR_CASH_OUT" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_CASH_OUT(
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{wdrPrc		,mode=IN,jdbcType=VARCHAR},
+			#{cnSndFee		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+            #{inCryCode		,mode=IN,jdbcType=VARCHAR},
+            #{exCryCode		,mode=IN,jdbcType=VARCHAR},
+            #{exRate		,mode=IN,jdbcType=VARCHAR},
+            #{outPrc		,mode=IN,jdbcType=VARCHAR},
+            #{payMthCd		,mode=IN,jdbcType=VARCHAR},
+            #{cardNo		,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=withdrowMap} ) }
+	</update>
+
+    <update id="PR_CASH_OUT2" parameterType="hashmap" statementType="CALLABLE">
+        { call PR_CASH_OUT2(
+                #{wdrReqCode	,mode=IN,jdbcType=VARCHAR},
+                #{userEmail		,mode=IN,jdbcType=VARCHAR},
+                #{wdrPrc		,mode=IN,jdbcType=VARCHAR},
+                #{cnSndFee		,mode=IN,jdbcType=VARCHAR},
+                #{regIp			,mode=IN,jdbcType=VARCHAR},
+                #{inCryCode		,mode=IN,jdbcType=VARCHAR},
+                #{exCryCode		,mode=IN,jdbcType=VARCHAR},
+                #{exRate		,mode=IN,jdbcType=VARCHAR},
+                #{outPrc		,mode=IN,jdbcType=VARCHAR},
+                #{payMthCd		,mode=IN,jdbcType=VARCHAR},
+                #{cardNo		,mode=IN,jdbcType=VARCHAR},
+                #{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=withdrowMap} ) }
+    </update>
+	
+	<select id="getWithFee" resultType="com.bitkrx.api.trade.vo.WithFeeVO">
+		SELECT 
+		    NVL(CN_KND_CD , 0) AS CURCYCD,
+            NVL(CN_SND_FEE , 0) AS FEE
+		FROM TB_10171067
+	</select>
+	
+	<select id="getWithList" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="com.bitkrx.api.trade.vo.WithListVO">
+		SELECT 
+		    T1.WDR_REQ_CODE WDRREQCODE,/*출금코드*/
+		    T1.WDR_PRC WDRPRC,/*출금액*/
+		    T1.USER_EMAIL USEREMAIL,/*이메일*/
+		    TO_CHAR(T1.REG_DT, 'YYYY-MM-DD HH24:MI:SS') REGDT,/*출금신청일시*/
+		    TO_CHAR(T1.WDR_CMPL_DT, 'YYYY-MM-DD HH24:MI:SS') WDRCMPLDT,/*승인완료일시*/
+		    TO_CHAR(T2.REG_DT, 'YYYY-MM-DD HH24:MI:SS') COMPDT,/*출금일시*/
+		    STATUS/*상태*/,
+		    T2.BANK_CD BANKCD,
+		    FN_CMM_CD(T2.BANK_CD,'') BANKNM,
+		    T2.KRX_ACT_CODE BANKACCNO,
+            T1.IN_CRY_CODE INCRYCODE,
+            T1.EX_CRY_CODE EXCRYCODE,
+            T1.EX_RATE EXRATE,
+            T1.OUT_PRC - (SELECT FEE_PRC FROM TB_20171027 WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE) OUTPRC,
+            (SELECT FEE_PRC FROM TB_20171027 WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE) FEEPRC,
+            PAY_MTH_CD PAYMTHCD,
+            CARD_NO CARDNO,
+            FAIL_MSG FAILMSG
+        FROM TB_20171020 T1, TB_201710124 T2
+		WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE(+)
+		AND T1.USER_EMAIL = #{userEmail}
+        <if test="payMthCd != '' ">
+        AND PAY_MTH_CD = #{payMthCd}
+        </if>
+		ORDER BY T1.WDR_REQ_CODE DESC
+	</select>
+
+    <select id="selectCashWith" parameterType="String" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+        SELECT
+        T1.WDR_REQ_CODE WDRREQCODE,/*출금코드*/
+        T1.WDR_PRC WDRPRC,/*출금액*/
+        T1.USER_EMAIL USEREMAIL,/*이메일*/
+        TO_CHAR(T1.REG_DT, 'YYYY-MM-DD HH24:MI:SS') REGDT,/*출금신청일시*/
+        TO_CHAR(T1.WDR_CMPL_DT, 'YYYY-MM-DD HH24:MI:SS') WDRCMPLDT,/*승인완료일시*/
+        TO_CHAR(T2.REG_DT, 'YYYY-MM-DD HH24:MI:SS') COMPDT,/*출금일시*/
+        STATUS/*상태*/,
+        T2.BANK_CD BANKCD,
+        FN_CMM_CD(T2.BANK_CD,'') BANKNM,
+        T2.KRX_ACT_CODE BANKACCNO,
+        T1.IN_CRY_CODE INCRYCODE,
+        T1.EX_CRY_CODE EXCRYCODE,
+        T1.EX_RATE EXRATE,
+        T1.OUT_PRC - (SELECT FEE_PRC FROM TB_20171027 WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE) OUTPRC,
+        (SELECT FEE_PRC FROM TB_20171027 WHERE WDR_REQ_CODE = T1.WDR_REQ_CODE) FEEPRC,
+        NVL(PAY_MTH_CD, 'A') PAYMTHCD,
+        CARD_NO CARDNO,
+        FAIL_MSG FAILMSG
+        FROM TB_20171020 T1, TB_201710124 T2
+        WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE(+)
+        AND T1.WDR_REQ_CODE = #{value}
+    </select>
+
+	<update id="PR_COIN_OUT" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_COIN_OUT(
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{wdrReqAmt		,mode=IN,jdbcType=VARCHAR},
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{cnSndFee		,mode=IN,jdbcType=VARCHAR},
+			#{wdrWletAdr	,mode=IN,jdbcType=VARCHAR},
+			#{dealNo		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+			#{feeRealAmt	,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=withdrowMap} ) }
+	</update>
+
+    <update id="uptCashStatus" parameterType="com.bitkrx.api.trade.vo.WithdrowVO">
+
+            UPDATE TB_20171020 SET
+                STATUS = #{status}
+                , WDR_CMPL_DT = SYSDATE
+                , FAIL_MSG = #{failMsg}
+                , UPT_EMAIL = #{uptEmail}
+                , UPT_DT = SYSDATE
+            WHERE WDR_REQ_CODE = #{wdrReqCode}
+    </update>
+
+	<select id="coinOutKey" resultType="String">
+		 SELECT
+		 	FN_GEN_KEY('TB_20171023', 'WDR_REQ_CODE', '') /* 코인출금신청코드 생성*/
+         FROM DUAL
+	</select>
+
+    <select id="cashOutKey" resultType="String">
+        SELECT
+            FN_GEN_KEY('TB_20171020', 'WDR_REQ_CODE', '') /* 현금출금신청코드 생성*/
+        FROM DUAL
+    </select>
+	
+	<update id="PR_COIN_OUT2" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_COIN_OUT2(
+			#{wdrReqCode	,mode=IN,jdbcType=VARCHAR},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{wdrReqAmt		,mode=IN,jdbcType=VARCHAR},
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{cnSndFee		,mode=IN,jdbcType=VARCHAR},
+			#{wdrWletAdr	,mode=IN,jdbcType=VARCHAR},
+			#{dealNo		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+			#{feeRealAmt	,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=withdrowMap} ) }
+	</update>
+	
+	<update id="PR_COIN_OUT_RTN" parameterType="hashmap" statementType="CALLABLE">
+		{ call PR_COIN_OUT_RTN(
+			#{wdrReqCode	,mode=IN,jdbcType=VARCHAR},
+			#{userEmail		,mode=IN,jdbcType=VARCHAR},
+			#{wdrReqAmt		,mode=IN,jdbcType=VARCHAR},
+			#{cnKndCd		,mode=IN,jdbcType=VARCHAR},
+			#{cnSndFee		,mode=IN,jdbcType=VARCHAR},
+			#{wdrWletAdr	,mode=IN,jdbcType=VARCHAR},
+			#{dealNo		,mode=IN,jdbcType=VARCHAR},
+			#{regIp			,mode=IN,jdbcType=VARCHAR},
+			#{feeRealAmt	,mode=IN,jdbcType=VARCHAR},
+			#{status			,mode=IN,jdbcType=VARCHAR},
+			#{failRsn			,mode=IN,jdbcType=VARCHAR},
+			#{failLog			,mode=IN,jdbcType=VARCHAR},
+			#{RESULT, mode=OUT, jdbcType=CURSOR, javaType=ResultSet, resultMap=withdrowMap} ) }
+	</update>
+	
+	<select id="getWithCoinList" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="com.bitkrx.api.trade.vo.WithCoinListVO">
+		SELECT 
+		    T1.WDR_REQ_CODE WDRREQCODE,/*송금신청코드*/
+		    T1.WDR_REQ_AMT WDRREQAMT,/*송금액*/
+		    T2.FEE_AMT FEEAMT,/*송금수수료*/
+		    T1.STATUS,/*상태*/
+		    T1.REG_DT REGDT,/*승인완료일*/
+		    T1.DEAL_NO DEALNO,/*거래번호*/
+		    T1.CN_KND_CD CNKNDCD,
+			CASE
+				WHEN T1.IN_GUBUN IN ('L1' ,'L2' , 'L3' , 'L4') THEN T1.IN_GUBUN
+				ELSE 'T'
+			END EXFLAG,
+			T1.UPT_DT UPTDT /*송금완료일*/
+		FROM TB_20171023 T1, TB_20171026 T2
+		WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+		AND T1.USER_EMAIL = #{userEmail}
+		<if test="cnKndCd != null and cnKndCd != '' ">
+			AND T1.CN_KND_CD = #{cnKndCd}
+		</if>
+        ORDER BY T1.REG_DT DESC , T1.WDR_REQ_CODE DESC
+	</select>
+	
+	<select id="selectWithCoin" resultType="com.bitkrx.api.trade.vo.WithCoinListVO">
+		SELECT 
+		    T1.WDR_REQ_CODE WDRREQCODE,/*송금신청코드*/
+		    T1.WDR_REQ_AMT WDRREQAMT,/*송금액*/
+		    T1.WDR_WLET_ADR WDRWLETADR,/*송금주소*/
+		    T2.FEE_AMT FEEAMT,/*송금수수료*/
+		    T1.STATUS,/*상태*/
+		    T1.REG_DT REGDT,/*승인완료일*/
+		    T1.DEAL_NO DEALNO,/*거래번호*/
+		    T1.CN_KND_CD CNKNDCD
+		FROM TB_20171023 T1, TB_20171026 T2
+		WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+		AND T1.WDR_REQ_CODE = #{wdrReqCode}
+        AND STATUS = 'CMMC00000000096'
+	</select>
+
+	<select id="selectWithExcelCoin" resultType="com.bitkrx.api.trade.vo.WithCoinListVO">
+		SELECT
+		    T1.WDR_REQ_CODE WDRREQCODE,/*송금신청코드*/
+		    T1.WDR_REQ_AMT WDRREQAMT,/*송금액*/
+		    T1.WDR_WLET_ADR WDRWLETADR,/*송금주소*/
+		    T2.FEE_AMT FEEAMT,/*송금수수료*/
+		    T1.STATUS,/*상태*/
+		    T1.REG_DT REGDT,/*승인완료일*/
+		    T1.DEAL_NO DEALNO,/*거래번호*/
+		    T1.CN_KND_CD CNKNDCD
+		FROM TB_20171023_1 T1, TB_20171026_2 T2
+		WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+		AND T1.WDR_REQ_CODE = #{wdrReqCode}
+        AND STATUS = 'CMMC00000000096'
+	</select>
+
+    <update id="uptWithCoinStaProgress" parameterType="String">
+
+        UPDATE TB_20171023 SET STATUS = 'CMMC00000000097', UPT_DT = SYSDATE WHERE WDR_REQ_CODE = #{wdrReqCode} AND STATUS = 'CMMC00000000096'
+
+    </update>
+
+	<update id="uptWithExcelCoinStaProgress" parameterType="String">
+
+        UPDATE TB_20171023_1 SET STATUS = 'CMMC00000000097', UPT_DT = SYSDATE WHERE WDR_REQ_CODE = #{wdrReqCode} AND STATUS = 'CMMC00000000096'
+
+    </update>
+
+	<select id="getRemPrc" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" 
+			resultType="com.bitkrx.api.trade.vo.MinMaxWithVO">
+		SELECT
+			NVL((SELECT MIN_AMT FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0) MINAMT,
+		    NVL((SELECT MAX_AMT FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0) MAXAMT,
+		    NVL((SELECT MAX_AMT_1DAY FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0)
+		    -
+		    NVL((SELECT
+		        SUM(WDR_PRC)
+		    FROM TB_20171020
+		    WHERE REG_EMAIL = #{userEmail}
+		    AND TO_CHAR(REG_DT, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD')), 0) MAXAMT1DAY
+		FROM DUAL
+	</select>
+
+    <select id="getRemPrc3" parameterType="com.bitkrx.api.trade.vo.WithdrowVO"
+            resultType="com.bitkrx.api.trade.vo.MinMaxWithVO">
+        SELECT
+			NVL((SELECT MIN_AMT_L3 FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0) MINAMT,
+		    NVL((SELECT MAX_AMT_L3 FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0) MAXAMT,
+		    NVL((SELECT MAX_AMT_1DAY_L3 FROM TB_10171074 WHERE CN_KND_CD = 'CMMC00000000204'), 0)
+		    -
+		    NVL((SELECT
+		        SUM(WDR_PRC)
+		    FROM TB_20171020
+		    WHERE REG_EMAIL = #{userEmail}
+		    AND TO_CHAR(REG_DT, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD')), 0) MAXAMT1DAY
+		FROM DUAL
+    </select>
+
+    <select id="getCoinRemPrc" parameterType="com.bitkrx.api.trade.vo.WithdrowVO"
+            resultType="com.bitkrx.api.trade.vo.MinMaxWithVO">
+
+        WITH G AS(
+                SELECT
+                    CASE
+                    WHEN KYC_CERT_YN = '1' THEN '3'
+                    WHEN OTP_SERIAL IS NOT NULL THEN '2'
+                    ELSE '1'
+                    END GRADE
+                FROM TB_10171021 WHERE USER_EMAIL = #{userEmail}
+        )
+        SELECT
+            (SELECT GRADE FROM G) GRADE,
+            NVL((SELECT MIN_AMT FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MINAMT,
+            NVL((SELECT MAX_AMT FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MAXAMT,
+            NVL((SELECT MAX_AMT_1DAY FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MAXAMTDAY,
+            NVL((SELECT MIN_AMT_L3 FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MINAMTL3,
+            NVL((SELECT MAX_AMT_L3 FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MAXAMTL3,
+            NVL((SELECT MAX_AMT_1DAY_L3 FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0) MAXAMTDAYL3,
+            NVL((SELECT MAX_AMT_1DAY FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0)
+            -
+            NVL((SELECT
+                     SUM(WDR_REQ_AMT)
+                 FROM TB_20171023
+                 WHERE REG_EMAIL = #{userEmail}
+                       AND CN_KND_CD = #{cnKndCd}
+                       AND TO_CHAR(REG_DT, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD')), 0) REMAMTDAY,
+            NVL((SELECT MAX_AMT_1DAY_L3 FROM TB_10171074 WHERE CN_KND_CD = #{cnKndCd}), 0)
+            -
+            NVL((SELECT
+                     SUM(WDR_REQ_AMT)
+                 FROM TB_20171023
+                 WHERE REG_EMAIL = #{userEmail}
+                       AND CN_KND_CD = #{cnKndCd}
+                       AND TO_CHAR(REG_DT, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD')), 0) REMAMTDAYL3
+        FROM DUAL
+
+	</select>
+	
+	<select id="getEthCode" parameterType="String" resultType="String">
+		SELECT FN_ETH_KEY(#{value}) FROM DUAL
+	</select>
+	
+	<select id="getPosCnAmt" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="String">
+		SELECT NVL(POS_AMT, 0) FROM VW_CN_AMT
+		WHERE USER_EMAIL = #{userEmail }
+        AND CN_KND_CD = #{cnKndCd }
+    </select>
+    
+    <select id="getBankList" resultType="com.bitkrx.api.trade.vo.BankListVO">
+		SELECT 
+			CMM_CD BANKCD,
+		    CMM_NM BANKNM,
+		    CMM_DESC BANKNO
+	 	FROM TB_30171021
+		WHERE CMM_UPPER_CD = #{cmmCd}
+		AND FILTER2 IN ( -- 사이트 아이디
+			SELECT CMM_NM FROM TB_30171021
+			WHERE CMM_CD = 'CMMC00000000001'
+			AND ROWNUM <![CDATA[ <= ]]>   1
+		)
+	</select>
+	
+	
+	<select id="getXrpUserEmail" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+		SELECT 
+			USER_EMAIL USEREMAIL
+		FROM 
+			TB_30171000
+		WHERE
+			TRIM(UPPER(WLET_ADR)) = TRIM(UPPER(#{wdrWletAdr}))
+        <if test="destiTag != null and destiTag != '' ">
+		AND
+			DESTI_TAG = #{destiTag}
+        </if>
+        AND ROWNUM = 1
+	</select>
+
+    <select id="getWletUserEmail" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+        SELECT
+            USER_EMAIL USEREMAIL
+        FROM
+            TB_30171000
+        WHERE
+            TRIM(UPPER(WLET_ADR)) = TRIM(UPPER(#{wdrWletAdr}))
+        AND WLET_KND_CD = #{cnKndCd}
+        <if test="destiTag != null and destiTag != '' ">
+            AND
+            DESTI_TAG = #{destiTag}
+        </if>
+
+        AND ROWNUM = 1
+    </select>
+
+
+
+    <select id="getExRateWithdrowPrc" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+
+        SELECT
+            ROUND((#{wdrPrc} - 1) * ROUND(MIN(EX_RATE), 2), 0) OUTPRC,
+            MAX(CRY_CODE) EXCRYCODE,
+            ROUND(MIN(EX_RATE), 2) EXRATE
+        FROM TB_50171011
+        WHERE CRY_CODE =
+              (SELECT CRY_CODE FROM TB_50171003 WHERE NATN_CODE =
+                                                      (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                                                                                               (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+        AND REG_DT BETWEEN SYSDATE - 2 AND SYSDATE
+
+    </select>
+
+    <select id="getCard1DayPrc" parameterType="String" resultType="String">
+
+        SELECT
+            NVL(SUM(OUT_PRC), 0)
+        FROM TB_20171020
+        WHERE REG_EMAIL = #{value}
+              AND TO_CHAR(REG_DT, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD')
+              AND PAY_MTH_CD = 'C'
+    </select>
+
+    <update id="uptInGubun" parameterType="String">
+
+        UPDATE TB_30171030 SET IN_GUBUN = 'Y' WHERE CN_DPT_CODE = #{value}
+    </update>
+
+	<select id="getCoinLimitYn" parameterType="String" resultType="String">
+		SELECT
+			SND_LIMT_YN
+		FROM
+			TB_10171074
+		WHERE
+			CN_KND_CD = #{value}
+	</select>
+
+	<select id="getWithdrowUserCheck" parameterType="com.bitkrx.api.trade.vo.WithdrowCheckVO" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			TB_50171065
+		WHERE
+			CN_KND_CD = #{curcyCd}
+		AND
+			SND_LIMT_YN = #{sndLimtYn}
+		AND
+			USE_YN = 'N'
+		AND
+			USER_EMAIL = #{userEmail}
+		AND
+			TO_CHAR(SYSDATE , 'YYYYMMDD') BETWEEN STD_DT AND END_DT + 1 - 1 / 24 / 60 / 60
+	</select>
+
+    <update id="uptRealFee" parameterType="com.bitkrx.api.trade.vo.WithdrowVO">
+
+        UPDATE TB_20171026 SET FEE_REAL_AMT = #{feeRealAmt}
+        WHERE WDR_REQ_CODE = #{wdrReqCode}
+    </update>
+
+    <select id="selectWithSendCoin" parameterType="String" resultType="com.bitkrx.api.trade.vo.WithCoinListVO">
+        SELECT
+            T1.WDR_REQ_CODE WDRREQCODE,/*송금신청코드*/
+            T1.WDR_REQ_AMT WDRREQAMT,/*송금액*/
+            T1.WDR_WLET_ADR WDRWLETADR,/*송금주소*/
+            T2.FEE_AMT FEEAMT,/*송금수수료*/
+            T1.STATUS,/*상태*/
+            T1.REG_DT REGDT,/*승인완료일*/
+            T1.DEAL_NO DEALNO,/*거래번호*/
+            T1.CN_KND_CD CNKNDCD
+        FROM TB_20171023 T1, TB_20171026 T2
+        WHERE T1.WDR_REQ_CODE = T2.WDR_REQ_CODE
+              AND T1.WDR_REQ_CODE = #{value}
+              AND STATUS = 'CMMC00000000099'
+    </select>
+
+	<select id="getWithdrowYn" parameterType="String" resultType="com.bitkrx.api.trade.vo.WithdrowCheckVO">
+		SELECT
+				SND_AUTO_YN SNDAUTOYN,
+				SND_AUTO_LIMT_AMT SNDAUTOLIMTAMT
+		FROM
+				TB_10171074
+		WHERE
+				CN_KND_CD = #{value}
+	</select>
+
+	<select id="getWithdrowUserAutoCheck" parameterType="com.bitkrx.api.trade.vo.WithdrowCheckVO" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			TB_50171067
+		WHERE
+			CN_KND_CD = #{curcyCd}
+		AND
+			USE_YN = 'N'
+		AND
+			USER_EMAIL = #{userEmail}
+		AND
+			TO_CHAR(SYSDATE , 'YYYYMMDD') BETWEEN STD_DT AND END_DT + 1 - 1 / 24 / 60 / 60
+	</select>
+
+	<select id="getCoinAutoYn" parameterType="String" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+		SELECT
+			SND_AUTO_YN SNDAUTOYN,
+			SND_AUTO_LIMT_AMT SNDAUTOLIMTAMT
+		FROM
+			TB_10171074
+		WHERE
+			CN_KND_CD = #{value}
+	</select>
+
+	<select id="getAutoUserCheck" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="int">
+		SELECT
+		 	COUNT(*)
+		FROM
+			TB_50171067
+		WHERE
+		 	USER_EMAIL = #{userEmail}
+		AND
+			CN_KND_CD = #{cnKndCd}
+		AND
+			USE_YN = 'N'
+		AND
+			SND_AUTO_YN = 'Y'
+		AND
+            TO_CHAR(SYSDATE , 'YYYYMMDD') BETWEEN STD_DT AND END_DT + 1 - 1 / 24 / 60 / 60
+	</select>
+
+    <select id="getCoinSendingList" resultType="com.bitkrx.api.trade.vo.WithdrowVO">
+
+        SELECT
+            WDR_REQ_CODE WDRREQCODE,
+            DEAL_NO DEALNO,
+            USER_EMAIL USEREMAIL,
+            WDR_REQ_AMT WDRREQAMT,
+            CN_KND_CD CNKNDCD,
+            (SELECT COIN_URL FROM TB_50171052 WHERE CN_KND_CD = T.CN_KND_CD) COINURL
+        FROM TB_20171023 T
+        WHERE STATUS = 'CMMC00000001387'
+
+    </select>
+
+	<select id="getInSndCheck" parameterType="String" resultType="String">
+		SELECT
+			INSND_AUTO_YN
+		FROM
+			TB_10171074
+		WHERE
+			CN_KND_CD = #{value}
+	</select>
+
+	<select id="getAccCheck" parameterType="com.bitkrx.api.trade.vo.KrwWithVO2" resultType="int">
+		WITH USERNATN AS (
+            SELECT * FROM TB_50171003 WHERE NATN_CODE =
+                (SELECT NATN_CODE FROM TB_50171001 WHERE BRH_CODE =
+                     (SELECT BRH_CODE FROM TB_10171020 WHERE USER_EMAIL = #{userEmail})))
+        SELECT
+          COUNT(T2.BANK_ACC_NO)
+        FROM VW_MNY_INFO T1, (SELECT * FROM TB_10171022 WHERE USE_YN = 'Y') T2
+        WHERE T1.USER_EMAIL = T2.USER_EMAIL(+)
+        AND T1.USER_EMAIL = #{userEmail}
+        AND T2.BANK_CD = #{bankCd}
+        AND T2.BANK_ACC_NO = #{bankAccNo}
+        AND T2.ACCNT_NM = #{accntNm}
+	</select>
+
+	<select id="getWithdrowCheck" parameterType="com.bitkrx.api.trade.vo.KrwWithVO2" resultType="int">
+		  SELECT COUNT(*)
+		   	FROM TB_20171020
+			WHERE WDR_REQ_CODE = #{wdrReqCode}
+			AND USER_EMAIL = #{userEmail}
+			AND OUT_PRC = #{outPrc} + (SELECT FEE_PRC FROM TB_20171027 WHERE WDR_REQ_CODE = #{wdrReqCode})
+	</select>
+
+	<select id="getFreeWithdrawCnt" parameterType="com.bitkrx.api.trade.vo.WithdrowVO" resultType="int">
+        SELECT
+        COUNT(*)
+        FROM TB_60180012
+        WHERE CNCL_YN = 'N'
+        AND STD_DT <![CDATA[ <= ]]> TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND END_DT <![CDATA[ >= ]]> TO_CHAR(SYSDATE, 'yyyyMMdd')
+        AND USER_EMAIL = #{userEmail}
+        AND CN_KND_CD = #{cnKndCd}
+    </select>
+
+	<select id="getUserAccInfo" parameterType="com.bitkrx.api.trade.vo.DepositVO" resultType="com.bitkrx.api.trade.vo.DepositVO">
+		SELECT
+			WLET_ADR WLETADR,
+			DESTI_TAG DESTINATIONTAG ,
+			PRIVATEKEY PRIVATEKEY
+		FROM
+			TB_30171000
+		WHERE
+			USER_EMAIL = #{userEmail}
+		AND
+			WLET_KND_CD = #{cnKndCd}
+	</select>
+
+	<insert id="InsBankInfo" parameterType="com.bitkrx.api.trade.vo.KrwWithVO">
+		INSERT INTO TB_201710124
+		(
+			WDR_REQ_CODE , REG_EMAIL , REG_DT ,
+			REG_IP , KRX_ACT_CODE , BANK_CD
+		)
+		VALUES
+		(
+		    #{wdrReqCode} , #{userEmail} , SYSDATE ,
+			#{regIp} , #{bankAccNo} , #{bankCd}
+		)
+	</insert>
+
+</mapper>

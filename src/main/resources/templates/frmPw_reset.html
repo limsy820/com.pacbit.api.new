@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>mail</title>
+    <meta charset="utf-8">
+</head>
+
+<body style="margin: 0px; padding: 0px;">
+<table style="line-height:1.2; border:0; border-collapse:collapse;border-spacing:0; margin:0 auto; padding:0; font-size:100%; font:inherit; font-family: 'Noto Sans KR', sans-serif; vertical-align:middle; border: 1px solid #e0e0e0;" width="790">
+    <tbody style="box-shadow: 1px 3px 30px #efefef; border: 1px solid #efefef;">
+    <tr style="width:790px; width: 100%; background: #fff;">
+        <td colspan="5" style="vertical-align:bottom; height:60px; padding: 20px 55px 0px;">
+            <a href="$webUrl">
+                <!--<img src="http://cmedgn.cmesoft.co.kr:801/planbit_mail/images/planbit_logo.png" width="160" height="42" alt="" />-->
+                <img src="$bi" width="160" height="42" alt="" />
+            </a>
+        </td>
+    </tr>
+
+    <!-- 타이틀부분 -->
+    <tr>
+        <td colspan="5" style="font-size:30px; color:#000; font-weight:bold; padding: 15px 55px 0px; position: relative; vertical-align: middle;">
+            <table style="width: 100%;">
+                <tr>
+                    <th style="text-align: left;">
+                        <h1 style="font-size:30px; vertical-align: middle; display: inline-block; color: #000">
+                            <span style="color: #176096;">$pwchange1</span>
+                        </h1>
+                    </th>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <tr>
+        <td colspan="5" height="130" style="">
+            <table style="width: 710px; margin-left: 40px; font-size: 16px;">
+                <tr style="display: inline-table; width: 100%;">
+                    <td style="font-size: 15px; padding: 0 15px 0;">
+                        <!--<p style="margin-top: 0; margin-bottom: 20px; line-height: 1.6;">-->
+                        <!--$title1-->
+                        <!--</p>-->
+                        <table style="margin-bottom: 20px; padding: 10px; border: 1px solid #eee; width: 100%;">
+                            <tr>
+                                <td style="padding: 10px 15px; font-size: 15px;">
+                                    $pwchange2
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- 버튼 -->
+    <tr>
+        <td colspan="5" style="padding: 0 55px 55px; text-align: center;">
+            <a href="$webUrl/bt.front.pwResetMail.dp/proc.go?user_email=$userEmail&sndCode=$sndCode&lang=$lang&logoUrl=$webUrl" style="text-decoration: none; width: 300px; display: inline-block; color: #fff; background-color: #e24a58; padding: 11px;">
+                $pwchange1
+            </a>
+        </td>
+    </tr>
+
+    <tr>
+        <td colspan="5" style="font-size:15px; color:#000; padding: 10px 60px 20px;">
+            $title1
+        </td>
+    </tr>
+
+    <tr>
+        <td colspan="5" height="20"></td>
+    </tr>
+
+    <!-- 하단부분 -->
+    <tr style="height:85px; background: #ecf0f2;">
+        <td colspan="5" style=" font-size:12px; color:#616161; padding: 15px 58px;">
+            <ul style="list-style: none; margin: 0; padding: 0;">
+                <li style="margin-bottom: 3px;">
+                    $title2
+                    <a href="$mailFrom" style="text-decoration: none; color:#616161; font-weight: bold;">$mailFrom</a>
+                    $title4
+                </li>
+                <li>
+                    $title7
+                    <!--© 2019 {거래소명} PTY Ltd. All rights reserved-->
+                </li>
+            </ul>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+</body>
+</html>

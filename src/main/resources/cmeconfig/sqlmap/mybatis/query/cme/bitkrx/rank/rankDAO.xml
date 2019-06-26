@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="RankDAO">
+	<select id="getRankList" parameterType="com.bitkrx.api.rank.vo.RankVO" resultType="com.bitkrx.api.rank.vo.RankVO">
+		SELECT
+			A1.RNK AS rank,
+			A1.USER_EMAIL AS rankId,
+			NVL(RTRIM(TO_CHAR(A1.DAY1_VOL,'FM99999999990.99999999'),'.') , 0) AS todayAmt,
+			NVL(RTRIM(TO_CHAR(A1.TOT_VOL,'FM99999999990.99999999'),'.') , 0) AS totalAmt,
+			NVL(RTRIM(TO_CHAR(A1.TOT_VOL * FN_CUR_PRICE('', 'CMMC00000001467'),'FM99999999990'),'.') , 0) AS totalPrc,
+			A1.GAP AS falling,
+			(CASE WHEN A1.GAP - (10 - A1.RNK) > 0 THEN 'Y' ELSE 'N' END) AS isNew
+		FROM
+	  	TB_EVENT20190621_MST A1
+		WHERE
+			1 = 1
+			AND A1.RNK <![CDATA[ <= ]]> 10
+			ORDER BY A1.RNK
+	</select>
+</mapper>
+
+
+

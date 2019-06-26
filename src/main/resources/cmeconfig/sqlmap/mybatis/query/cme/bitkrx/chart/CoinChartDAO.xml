@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CoinChartDAO">
+	
+	
+	<select id="selectCoinChart" parameterType="coinChartVO" resultType="String">
+		SELECT FN_CHART(#{tradeTime}, #{curcyCd}) from dual
+	</select>
+	
+	<insert id="insertChartData" parameterType="coinChartVO">
+		INSERT INTO TB_CHART_DATA
+			(   
+			    CHA_CODE,
+			    CHA_DATA,
+			    TM_CODE,
+			    CN_KND_CD)
+			VALUES
+			(
+			    FN_GEN_KEY('TB_CHART_DATA_' || FN_CMM_CD(#{curcyCd}, '') , FN_CMM_CD(#{curcyCd}, '') || '_DATA', ''),
+			    FN_CHART_ARR(TO_CHAR(TRUNC((sysdate-1/24/60),'MI'),'YYYYMMDDHH24MISS'), #{time}, #{curcyCd}),
+			    #{tmCode},
+			    #{curcyCd}
+			)
+	</insert>
+
+</mapper>
