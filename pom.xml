@@ -13,7 +13,7 @@
  	
  <properties>
     <spring.maven.artifact.version>4.3.10.RELEASE</spring.maven.artifact.version>
-    <spring.org.framework.version>4.3.10.RELEASE</spring.org.framework.version>
+    <spring.org.framework.version>5.3.19</spring.org.framework.version>
     <maven.test.skip>true</maven.test.skip>
   </properties>	
  	
